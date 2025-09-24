@@ -1,0 +1,16 @@
+{
+    "name": "HighElixir.Editor.UI",
+    "rootNamespace": "",
+    "references": [
+        "GUID:cc4602d02a189d2408a9366f01305ae8"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
