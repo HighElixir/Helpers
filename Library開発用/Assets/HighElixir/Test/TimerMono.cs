@@ -1,63 +1,93 @@
 ﻿using HighElixir.Timers;
+using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
-
+using UnityEngine.UI;
+using UniRx;
 namespace HighElixir.Test
 {
     public class TimerMono : MonoBehaviour
     {
+        [Header("Imgs")]
+        [SerializeField] private Image _img1;
+        [SerializeField] private Image _img2;
+        [Header("Text")]
+        [SerializeField] private TMP_Text _text;
 
-        private Timer _timer;
         private float _countDown = 5f;
         private float _countDown2 = 5f;
         private float _countDown3 = 8f;
         private float _countDown4 = 2f;
+        private float _pulse = 12f;
         private string _id = "TestTimer";
-        private float _countUpInterval = 1f;
+        private float _countUpInterval = 100f;
+        private Dictionary<string, TimerTicket> _ticketHolder = new();
         private void Awake()
         {
-            _timer = new Timer(GetType());
-            _timer.CountDownRegister(nameof(_countDown), _countDown, () => Debug.Log("CountDown 1 finished"));
-            _timer.CountDownRegister(nameof(_countDown2), _countDown2, () =>
+            var audio = GetComponent<AudioSource>();
+            var pu = GlobalTimer.Update.PulseRegister(_pulse, "パルス", () =>
+            {
+                audio.Play();
+            });
+            _ticketHolder[nameof(_countDown)] = GlobalTimer.Update.CountDownRegister(_countDown, nameof(_countDown), () => Debug.Log("CountDown 1 finished"));
+            _ticketHolder[nameof(_countDown2)] = GlobalTimer.Update.CountDownRegister(_countDown2, nameof(_countDown2), () =>
             {
                 Debug.Log("CountDown 2 finished");
-                _timer.Start(nameof(_countDown4), isLazy: true);
+                GlobalTimer.Update.Start(_ticketHolder[nameof(_countDown4)], isLazy: true);
+                _img1.color = Color.black;
             });
-            _timer.CountDownRegister(nameof(_countDown3), _countDown3, () =>
+            _ticketHolder[nameof(_countDown3)] = GlobalTimer.FixedUpdate.CountDownRegister(_countDown3, nameof(_countDown3), () =>
             {
                 Debug.Log("CountDown 3 finished");
-                _timer.Start(nameof(_countDown3), isLazy: true);
+                GlobalTimer.FixedUpdate.Start(_ticketHolder[nameof(_countDown3)], isLazy: true);
                 if (RandomExtensions.Chance(0.2f))
                 {
-                    _timer.Reset(_id, isLazy: true);
+                    GlobalTimer.FixedUpdate.Restart(_ticketHolder[_id], isLazy: true);
+                    _img2.color = Color.blue;
+                }
+                else
+                {
+                    _img2.color = Color.yellow;
                 }
             });
-            _timer.CountDownRegister(nameof(_countDown4), _countDown4, () =>
+            _ticketHolder[nameof(_countDown4)] = GlobalTimer.Update.CountDownRegister(_countDown4, nameof(_countDown4), () =>
             {
                 Debug.Log("CountDown 4 finished");
-                _timer.Start(nameof(_countDown2), isLazy: true);
+                GlobalTimer.Update.Start(_ticketHolder[nameof(_countDown2)], isLazy: true);
+                _img1.color = Color.green;
             });
-            _timer.CountDownRegister(nameof(_countUpInterval), _countUpInterval, () =>
-            {
-                _timer.Start(_id, init: false, isLazy: true);
-            });
-            _timer.CountUpRegister(_id, () =>
+            _ticketHolder[nameof(_countUpInterval)] = GlobalTimer.FixedUpdate.CountDownRegister(_countUpInterval, nameof(_countUpInterval), null, true);
+            _ticketHolder[_id] = GlobalTimer.FixedUpdate.CountUpRegister(_id, () =>
             {
                 Debug.Log("CountUp reseted");
-                _timer.Start(nameof(_countUpInterval), isLazy:true);
+                GlobalTimer.FixedUpdate.Start(_ticketHolder[nameof(_countUpInterval)], isLazy: false);
             });
-
-            // タイマー開始
-            _timer.Start(nameof(_countDown));
-            _timer.Start(nameof(_countDown2));
-            _timer.Start(nameof(_countDown3));
-            _timer.Start(_id);
+            if (GlobalTimer.FixedUpdate.TryGetIObservable(_ticketHolder[_id], out var observable))
+            {
+                observable.Subscribe(time =>
+                {
+                    _text.SetText($"Time : {time:0.00} s");
+                });
+            }
+            //// タイマー開始
+            GlobalTimer.Update.Start(_ticketHolder[nameof(_countDown)]);
+            GlobalTimer.Update.Start(_ticketHolder[nameof(_countDown2)]);
+            GlobalTimer.FixedUpdate.Start(_ticketHolder[nameof(_countDown3)]);
+            GlobalTimer.FixedUpdate.Start(_ticketHolder[_id]);
+            GlobalTimer.Update.Start(pu);
         }
 
-        // Update is called once per frame
-        private void FixedUpdate()
+        public void Restart()
         {
-            //Debug.Log($"[TimerMono] {_timer.Contains(nameof(_countDown))} {_timer.Contains(nameof(_countDown2))} {_timer.Contains(nameof(_countDown3))} {_timer.Contains(nameof(_countDown4))}");
-            _timer.Update(Time.fixedDeltaTime);
+            GlobalTimer.FixedUpdate.Restart(_ticketHolder[_id], true);
+        }
+        public void StartC()
+        {
+            GlobalTimer.FixedUpdate.Start(_ticketHolder[_id], false, true);
+        }
+        public void Pause()
+        {
+            GlobalTimer.FixedUpdate.Stop(_ticketHolder[_id], false, true);
         }
     }
 }

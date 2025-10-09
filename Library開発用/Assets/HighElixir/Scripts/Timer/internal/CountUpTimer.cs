@@ -1,11 +1,15 @@
 ﻿using System;
+using UnityEngine;
 
 namespace HighElixir.Timers.Internal
 {
-    internal sealed class CountUpTimer : InternalTimerBase
+    internal class CountUpTimer : InternalTimerBase
     {
-        public override float NormalizedElapsed => 0f;
+        public override float NormalizedElapsed => 1f;
 
+        public override CountType CountType => CountType.CountUp;
+
+        public override bool IsFinished => false;
 
         public CountUpTimer(Action onReset = null)
             : base(onReset)
@@ -22,14 +26,7 @@ namespace HighElixir.Timers.Internal
         public override void Update(float dt)
         {
             if (dt <= 0f) return; // 負やゼロを無視
-
-            var next = Current + dt;
-            if (next > 0f)
-            {
-                Current = next;
-                return;
-            }
-            Current = 0f;
+            Current += dt;
         }
     }
 }

@@ -1,10 +1,12 @@
 {
     "name": "HighElixir.Editor",
-    "rootNamespace": "",
+    "rootNamespace": "HighElixir.Editors",
     "references": [
         "GUID:3151164fd1f9d9a459a35d877bf09d55"
     ],
-    "includePlatforms": [],
+    "includePlatforms": [
+        "Editor"
+    ],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
     "overrideReferences": false,

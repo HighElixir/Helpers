@@ -1,101 +1,202 @@
-﻿using UnityEditor;
+﻿using HighElixir.Timers;
+using System;
+using System.Collections.Generic;
+using UnityEditor;
 using UnityEngine;
 
-namespace HighElixir.Editor
+namespace HighElixir.Editors
 {
     public class TimerWatcher : EditorWindow
     {
+        private class Wrapper
+        {
+            public string Parent;
+            public TimerSnapshot Snapshot;
+
+            public Wrapper(string type, TimerSnapshot snapshot)
+            {
+                Parent = type;
+                Snapshot = snapshot;
+            }
+
+            public static List<Wrapper> FromSnapshots(string parent, IEnumerable<TimerSnapshot> snapshots)
+            {
+                var list = new List<Wrapper>();
+                foreach (var snap in snapshots)
+                {
+                    list.Add(new Wrapper(parent, snap));
+                }
+                return list;
+            }
+        }
+
+        private enum SortMode
+        {
+            ParentType,
+            Name,
+            CountType,
+            Current,
+            Initialize,
+            IsRunning,
+            IsFinished
+        }
+
+        private SortMode _sortMode = SortMode.ParentType;
+        private bool _sortAscending = true;
         private Vector2 _scroll;
         private Color _currentColor = Color.clear;
-        private System.Type _lastParentType = null;
+        private string _lastParentType = null;
+        private readonly Dictionary<string, Color> _typeColorMap = new();
 
         [MenuItem("HighElixir/Timer")]
         public static void ShowWindow()
         {
-            GetWindow(typeof(TimerWatcher));
+            GetWindow(typeof(TimerWatcher), false, "Timer Watcher");
         }
 
-        private void Print(string one, string two, string three, float four, string five, string six, bool seven, bool isUp, Color color = default)
+        private void Print(string parent, string name, string countType, float normalized, string current, string init, bool running, bool finished, bool isUp, string option = "", int optionWidth = 100, Color color = default)
         {
             Rect rect = EditorGUILayout.BeginHorizontal();
 
-            // 背景を塗る
             if (color != default)
                 EditorGUI.DrawRect(rect, color);
 
-            // 行の内容
-            EditorGUILayout.LabelField(one, GUILayout.Width(120));
-            EditorGUILayout.LabelField(two, GUILayout.Width(100));
-            EditorGUILayout.LabelField(three, GUILayout.Width(120));
-            var text = $"{five:0.00}/{six:0.00}";
-            if (isUp)
-            {
-                four = 1f;
-                text = $"{five:0.00}";
-            }
+            EditorGUILayout.LabelField(parent, GUILayout.Width(120));
+            EditorGUILayout.LabelField(name, GUILayout.Width(100));
+            EditorGUILayout.LabelField(countType, GUILayout.Width(120));
+            var text = isUp ? $"{current}" : $"{current} / {init}";
             EditorGUI.ProgressBar(
                 EditorGUILayout.GetControlRect(GUILayout.Width(200)),
-                four,
+                normalized,
                 text
             );
-            EditorGUILayout.LabelField(seven ? "▶" : "■", GUILayout.Width(30));
 
+            EditorGUILayout.LabelField(running ? "▶" : "■", GUILayout.Width(30));
+            EditorGUILayout.LabelField(finished ? "✔" : "", GUILayout.Width(30));
+            if (!string.IsNullOrEmpty(current))
+                EditorGUILayout.LabelField(option, GUILayout.Width(optionWidth));
             EditorGUILayout.EndHorizontal();
-
         }
+
         private void OnGUI()
         {
+            _scroll = EditorGUILayout.BeginScrollView(_scroll);
+
             if (Application.isPlaying)
             {
-                _scroll = EditorGUILayout.BeginScrollView(_scroll);
-
-                Print(
-                    "ParentType",
-                    "ID",
-                    "Timer",
-                    1f,
-                   "Current",
-                    "",
-                    true,
-                    true);
-                foreach (var timer in HighElixir.Timers.Timer.AllTimers)
+                // ソートモード
+                EditorGUILayout.BeginHorizontal();
+                EditorGUILayout.LabelField("SortMode:", GUILayout.Width(70));
+                if (GUILayout.Button(_sortMode.ToString(), GUILayout.Width(120)))
                 {
-                    // ParentType が変わったときだけ色を切り替え
-                    if (_lastParentType != timer.ParentType)
+                    _sortMode++;
+                    if (!Enum.IsDefined(typeof(SortMode), _sortMode))
+                        _sortMode = SortMode.ParentType;
+                }
+
+                var ascText = _sortAscending ? "Ascending" : "Descending";
+                if (GUILayout.Button(ascText, GUILayout.Width(120)))
+                    _sortAscending = !_sortAscending;
+
+                EditorGUILayout.EndHorizontal();
+
+                // ヘッダー
+                Print("Parent", "Name", "CountType", 1f, "Current", "Init", true, false, true);
+
+                // データ収集
+                int totalCommands = 0;
+                var timers = new List<Wrapper>();
+                foreach (var rTimer in Timer.AllTimers)
+                {
+                    totalCommands += rTimer.CommandCount;
+                    timers.AddRange(Wrapper.FromSnapshots(rTimer.ParentName, rTimer.GetSnapshot()));
+                }
+
+                // ソート
+                timers.Sort((a, b) =>
+                {
+                    int cmp = 0;
+                    switch (_sortMode)
+                    {
+                        case SortMode.ParentType:
+                            cmp = string.Compare(a.Parent, b.Parent, StringComparison.Ordinal);
+                            break;
+                        case SortMode.Name:
+                            cmp = string.Compare(a.Snapshot.Name, b.Snapshot.Name, StringComparison.Ordinal);
+                            break;
+                        case SortMode.CountType:
+                            cmp = a.Snapshot.CountType.CompareTo(b.Snapshot.CountType);
+                            break;
+                        case SortMode.Current:
+                            cmp = a.Snapshot.Current.CompareTo(b.Snapshot.Current);
+                            break;
+                        case SortMode.Initialize:
+                            cmp = a.Snapshot.Initialize.CompareTo(b.Snapshot.Initialize);
+                            break;
+                        case SortMode.IsRunning:
+                            cmp = a.Snapshot.IsRunning.CompareTo(b.Snapshot.IsRunning);
+                            break;
+                        case SortMode.IsFinished:
+                            cmp = a.Snapshot.IsFinished.CompareTo(b.Snapshot.IsFinished);
+                            break;
+                    }
+                    return _sortAscending ? cmp : -cmp;
+                });
+
+                // 表示
+                foreach (var timer in timers)
+                {
+                    if (_lastParentType != timer.Parent && !_typeColorMap.ContainsKey(timer.Parent))
                     {
                         Color newColor;
                         do
                         {
-                            newColor = Random.ColorHSV(0f, 1f, 0.4f, 0.8f, 0.7f, 1f);
+                            newColor = UnityEngine.Random.ColorHSV(0.6f, 1f, 0.6f, 1f, 0.6f, 1f);
                         } while (newColor == _currentColor);
 
                         _currentColor = newColor;
-                        _lastParentType = timer.ParentType;
+                        _typeColorMap[timer.Parent] = newColor;
+                        _lastParentType = timer.Parent;
                     }
-
-                    foreach (var snap in timer.GetSnapshot())
+                    else if (_typeColorMap.ContainsKey(timer.Parent))
                     {
-                        bool isUp = snap.TimerClass.Contains("CountUp");
-                        Print(
-                            timer.ParentType.Name,
-                            snap.Id,
-                            snap.TimerClass,
-                            snap.NormalizedElapsed,
-                            $"{snap.Current:0.00}",
-                            $"{snap.Initialize:0.00}",
-                            snap.IsRunning,
-                            isUp,
-                            _currentColor);
+                        _currentColor = _typeColorMap[timer.Parent];
                     }
-                    Print("LastCommandCount:", $"{timer.CommandCount}", "", 1f, "", "", true, true, _currentColor);
+                    var tp = timer.Snapshot.CountType;
+                    bool isUp = tp.Has(CountType.CountUp);
+                    string tmp = tp.Has(CountType.Tick) ? " (Tick)" : "";
+                    string postfix1 = isUp ? tmp : "";
+                    string postfix2 = isUp ? "" : tmp;
+                    string option = "";
+                    int optionWidth = 100;
+                    if (tp.Has(CountType.Pulse))
+                    {
+                        option = $"PulseCount : {timer.Snapshot.Optional}";
+                    }
+                    Print(
+                        timer.Snapshot.ParentName ?? timer.Parent,
+                        timer.Snapshot.Name,
+                        timer.Snapshot.CountType.ToString(),
+                        timer.Snapshot.NormalizedElapsed,
+                        $"{timer.Snapshot.Current:0.00}" + postfix1,
+                        $"{timer.Snapshot.Initialize:0.00}" + postfix2,
+                        timer.Snapshot.IsRunning,
+                        timer.Snapshot.IsFinished,
+                        isUp,
+                        option,
+                        optionWidth,
+                        _currentColor
+                    );
                 }
 
-                EditorGUILayout.EndScrollView();
+                EditorGUILayout.LabelField($"LazeCommands : {totalCommands}");
             }
             else
             {
                 GUILayout.Label("Enter Play Mode to view timers.", EditorStyles.boldLabel);
             }
+
+            EditorGUILayout.EndScrollView();
         }
 
         private void OnInspectorUpdate()

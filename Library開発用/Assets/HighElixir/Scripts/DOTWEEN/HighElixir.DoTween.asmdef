@@ -1,0 +1,19 @@
+{
+    "name": "HighElixir.DoTween",
+    "rootNamespace": "",
+    "references": [
+        "GUID:c9c7c4b00a0a77f499cbea7db7ce37d0",
+        "GUID:f51ebe6a0ceec4240a699833d6309b23",
+        "GUID:029c1c1b674aaae47a6841a0b89ad80e",
+        "GUID:3151164fd1f9d9a459a35d877bf09d55"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

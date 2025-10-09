@@ -5,6 +5,7 @@ using UniRx.Triggers;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UI;
+using HighElixir.Hedgeable;
 
 namespace HighElixir.UI.Countable
 {

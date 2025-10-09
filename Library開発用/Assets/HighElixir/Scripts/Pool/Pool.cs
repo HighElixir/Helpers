@@ -15,6 +15,11 @@ namespace HighElixir.Pool
         public Transform Container => _container;
         public List<T> InUse => new List<T>(_inUse);
         public bool Initialized { get; private set; } = false;
+
+        // 取得・解放するオブジェクトを操作したい時用
+        public event Action<T> OnGetEvt;
+        public event Action<T> OnReleaseEvt;
+        public event Action<PooledObject<T>> OnAcquirePooledEvt;
         public Pool(T original, int maxPoolSize, Transform container = null, bool LazeCreate = false)
         {
             if (original == null) throw new ArgumentNullException(nameof(original));
@@ -34,27 +39,22 @@ namespace HighElixir.Pool
         }
         public T Get()
         {
-            T obj = _available.Count > 0
-                ? _available.Pop()
-                : CreateInstance();
-
-            if (!_inUse.Add(obj))
-                Debug.LogWarning($"{obj.name} はすでに使用中です", obj);
-
-            SetActive(obj, true);
+            var obj = Get_Internal();
+            OnGetEvt?.Invoke(obj);
             return obj;
         }
 
         public PooledObject<T> GetPooled()
         {
-            var pooled = new PooledObject<T>(Get(), this);
+            var pooled = new PooledObject<T>(Get_Internal(), this);
+            OnAcquirePooledEvt?.Invoke(pooled);
             return pooled;
         }
         public void Release(T obj)
         {
             if (obj == null) return;
             if (_available.Contains(obj)) return;
-
+            OnReleaseEvt?.Invoke(obj);
             if (_inUse.Remove(obj))
             {
                 SetActive(obj, false);
@@ -78,6 +78,9 @@ namespace HighElixir.Pool
                 DestroyObject(obj);
             _available.Clear();
             _inUse.Clear();
+            OnGetEvt = null;
+            OnReleaseEvt = null;
+            OnAcquirePooledEvt = null;
         }
         public void SetPoolSize(int poolSize)
         {
@@ -103,7 +106,19 @@ namespace HighElixir.Pool
             foreach (var obj in _available)
                 SetParent(obj, _container);
         }
-        // 👅 GameObject / Component 両対応の生成処理
+
+        private T Get_Internal()
+        {
+            T obj = _available.Count > 0
+                ? _available.Pop()
+                : CreateInstance();
+
+            if (!_inUse.Add(obj))
+                Debug.LogWarning($"{obj.name} はすでに使用中です", obj);
+
+            SetActive(obj, true);
+            return obj;
+        }
         private void CreateInstances(int count)
         {
             for (int i = 0; i < count; i++)
@@ -148,7 +163,7 @@ namespace HighElixir.Pool
         {
             if (obj is GameObject go) UnityEngine.Object.Destroy(go);
             else if (obj is Component comp) UnityEngine.Object.Destroy(comp.gameObject);
-            else UnityEngine.Object.Destroy(obj); // 念のため
+            else UnityEngine.Object.Destroy(obj);
         }
     }
 }

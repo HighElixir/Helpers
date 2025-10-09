@@ -1,7 +1,10 @@
 ﻿using System;
 
-namespace HighElixir
+namespace HighElixir.Hedgeable
 {
+    /// <summary>
+    /// 特定の範囲内で値を変化させることができる int 型のラッパー。
+    /// </summary>
     public class HedgeableInt : IHedgeable<int, HedgeableInt>
     {
         private int _value;
@@ -35,6 +38,9 @@ namespace HighElixir
                 Direction = diff;
             }
         }
+        /// <summary>
+        /// 直前の値からの変化方向を示す。
+        /// </summary>
         public int Direction
         {
             get => _direction;

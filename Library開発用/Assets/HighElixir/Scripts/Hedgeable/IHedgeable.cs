@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace HighElixir
+namespace HighElixir.Hedgeable
 {
     /// <summary>
     /// ヘッジ可能な要素を表すインターフェース。

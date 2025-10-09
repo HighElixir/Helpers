@@ -1,6 +1,4 @@
-﻿using HighElixir.Timers.Internal;
-using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 namespace HighElixir.Timers
 {
@@ -10,7 +8,7 @@ namespace HighElixir.Timers
     public interface IReadOnlyTimer
     {
         int CommandCount { get; }
-        Type ParentType { get; }
+        string ParentName { get; }
         IEnumerable<TimerSnapshot> GetSnapshot();
     }
 }
