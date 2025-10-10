@@ -10,19 +10,22 @@ namespace HighElixir.Tweenworks.Internal
     [Serializable]
     internal class TweenProfiler : IDisposable
     {
-        [SerializeField]
+        [SerializeField, Tooltip("このプロファイルの名前")]
         private string _name;
-        [SerializeField]
+        [SerializeField, Tooltip("このプロファイルの再生種別")]
         private ProfilerType _type;
-        [SerializeField, Min(-1)]
+        [SerializeField, Min(-1), Tooltip("ループ回数（無限ループ(-1)の場合、1回ループで完了扱いになる。(再生自体は続行)）")]
         private int _loop;
+        [SerializeField]
+        private LoopType _loopType;
         [SerializeReference]
         private List<ITweenUser> _users = new();
 
         private Sequence _sequence;
-
+        private bool _initflg = false;
+        private readonly SemaphoreSlim _gate = new(1, 1);
         // 全ての再生が完了した後のコールバック
-        public event Action OnComplete;
+        public event Action<CompletionType> OnComplete;
 
         public string Name { get => _name; set => _name = value; }
         public ProfilerType Type => _type;
@@ -39,44 +42,102 @@ namespace HighElixir.Tweenworks.Internal
             }
         }
         public bool IsInfinityLoop => _loop == -1;
-        public async UniTask Invoke(Action action, CancellationToken token = default)
+        public bool IsPlaying => _sequence.IsActive() && _sequence.IsPlaying();
+
+        public float Progress
         {
-            if (_sequence.IsActive()) _sequence.Kill();
-            OnComplete += action;
-            var e = _users.GetEnumerator();
-            while (e.MoveNext())
+            get
             {
-                var tween = e.Current.Invoke(); // TweenUserBase.Invoke()でTweenを取得
-                if (tween == null) continue;
-
-                if (_type == ProfilerType.Parallel)
-                    _sequence.Join(tween);
-                else
-                    _sequence.Append(tween);
+                if (!IsPlaying) return -1;
+                return _sequence.ElapsedPercentage(IsInfinityLoop);
             }
-            _sequence.SetLoops(_loop, LoopType.Restart);
+        }
+        /// <summary>
+        /// このプロファイラーを起動する
+        /// </summary>
+        /// <param name="action"></param>
+        /// <param name="token"></param>
+        /// <returns></returns>
+        public async UniTask Invoke(Action<CompletionType> action, CancellationToken token = default)
+        {
+            await _gate.WaitAsync(token);
+            var restart = true;
+            if (_sequence.IsActive()) _sequence.Rewind();
+            else if (_sequence == null)
+            {
+                _sequence = DOTween.Sequence();
+                _sequence.SetAutoKill(false);
+                _sequence.OnKill(() => _initflg = false);
+                _initflg = false;
+                restart = false;
+            }
+            OnComplete += action;
+            if (!_initflg)
+            {
+                foreach (var u in _users)
+                {
+                    var tween = u?.Invoke();
+                    if (tween == null) continue;
+                    if (_type == ProfilerType.Parallel) _sequence.Join(tween);
+                    else _sequence.Append(tween);
+                }
+                _sequence.SetLoops(_loop, _loopType);
+                _initflg = true;
+            }
+            if (restart) _sequence.Restart();
+            else _sequence.Play();
 
+            // 非同期連携
             UniTask task;
             if (IsInfinityLoop)
                 task = _sequence.AsyncWaitForElapsedLoops(1).AsUniTask();
             else
                 task = _sequence.AsyncWaitForCompletion().AsUniTask();
-            await task;
-            OnComplete?.Invoke();
-            OnComplete = null;
+            try
+            {
+                await task.AttachExternalCancellation(token);
+                token.ThrowIfCancellationRequested();
+                OnComplete?.Invoke(IsInfinityLoop ? CompletionType.Looping : CompletionType.Done);
+
+            }
+            catch (OperationCanceledException)
+            {
+                Stop();
+                OnComplete?.Invoke(CompletionType.Interrupted);
+            }
+            catch (Exception ex)
+            {
+                if (ex is OperationCanceledException) return;
+                Debug.LogException(ex);
+                _sequence.Kill();
+                _initflg = false;
+                OnComplete?.Invoke(CompletionType.Errored);
+            }
+            finally
+            {
+                OnComplete -= action;
+                _gate.Release();
+            }
         }
 
         public void Pause(bool pause)
         {
-            if (pause)
-                _sequence.Pause();
-            else
-                _sequence.Play();
+            if (_sequence.IsActive())
+            {
+                if (pause)
+                    _sequence.Pause();
+                else
+                    _sequence.Play();
+            }
         }
 
         public void Stop()
         {
-            _sequence.Kill();
+            if (_sequence.IsActive())
+            {
+                _sequence.Pause();
+                _sequence.Rewind();
+            }
         }
         public void Bind(GameObject go)
         {
@@ -89,6 +150,7 @@ namespace HighElixir.Tweenworks.Internal
 
         public void Dispose()
         {
+            if (_sequence.IsActive()) _sequence.Kill();
             foreach (var user in _users)
             {
                 user.Dispose();

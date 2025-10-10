@@ -1,0 +1,20 @@
+{
+    "name": "HighElixir.Editor.DOTween",
+    "rootNamespace": "",
+    "references": [
+        "GUID:c9c7c4b00a0a77f499cbea7db7ce37d0",
+        "GUID:f51ebe6a0ceec4240a699833d6309b23",
+        "GUID:0a57ba1eef27c9243a5def8a7b07dc7b"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

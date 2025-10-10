@@ -34,7 +34,7 @@ namespace HighElixir.Tweenworks
         public void Bind(GameObject target)
         {
             _target = target;
-            if (_tween.IsPlaying()) _tween.Kill();
+            if (_tween.IsActive()) _tween.Kill();
             _tween = GetTween(_target);
         }
 

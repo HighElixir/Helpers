@@ -12,8 +12,8 @@ namespace HighElixir.Tweenworks
         [SerializeField] private Vector3 _pos2 = Vector3.zero;
 
         [Header("Options")]
-        [SerializeField] private float _duration = 1f;
-        [SerializeField] private int _time = 0;
+        [SerializeField, Tooltip("１サイクルの所要時間")] private float _duration = 1f;
+        [SerializeField, Tooltip("ループ回数")] private int _time = 0;
         [SerializeField] private bool _isLocal = false;
 
         protected override Tween GetTween(GameObject go)

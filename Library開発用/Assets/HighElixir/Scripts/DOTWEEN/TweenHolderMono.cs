@@ -3,7 +3,6 @@ using HighElixir.Tweenworks.Internal;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Windows;
 
 namespace HighElixir.Tweenworks
 {
@@ -15,12 +14,14 @@ namespace HighElixir.Tweenworks
         [SerializeField]
         [Tooltip("Awake時点でnullの場合、自動的にアタッチされたオブジェクトを使用する")]
         private GameObject _target;
+
+        private Dictionary<string, TweenProfiler> _dict = new();
         public List<string> GetProfierName()
         {
             return _profilers.ConvertAll<string>(x => x.Name);
         }
 
-        public async UniTask Invoke(string profilerName, Action onComplete)
+        public async UniTask Invoke(string profilerName, Action<CompletionType> onComplete)
         {
             if (TryGet(profilerName, out var profiler))
             {
@@ -68,8 +69,10 @@ namespace HighElixir.Tweenworks
         }
         private bool TryGet(string profilerName, out TweenProfiler profiler)
         {
-            profiler = _profilers.Find(x => x.Name == profilerName);
-            return profiler != null;
+            var res = _dict.TryGetValue(profilerName, out profiler);
+            if (!res)
+                Debug.LogWarning($"Profiler '{name}' not found");
+            return res;
         }
 
         // Unity
@@ -84,11 +87,16 @@ namespace HighElixir.Tweenworks
                 Destroy(gameObject);
                 return;
             }
+            CheckValue();
             BindTarget(_target);
+            foreach (var profiler in _profilers)
+            {
+                _dict[profiler.Name] = profiler;
+            }
         }
         private void OnDestroy()
         {
-            foreach(var profiler in _profilers)
+            foreach (var profiler in _profilers)
             {
                 profiler.Dispose();
             }

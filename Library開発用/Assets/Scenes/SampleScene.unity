@@ -783,7 +783,6 @@ GameObject:
   - component: {fileID: 952677006}
   - component: {fileID: 952677005}
   - component: {fileID: 952677004}
-  - component: {fileID: 952677003}
   m_Layer: 0
   m_Name: Cube
   m_TagString: Untagged
@@ -791,18 +790,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &952677003
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 952677002}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ee86d80961f101145bd1b8c4ad5b1fd7, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!65 &952677004
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -1028,8 +1015,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _profilers:
   - _name: New Profiler
-    _type: 0
-    _loop: 0
+    _type: 1
+    _loop: 1
+    _loopType: 0
     _users: []
   _target: {fileID: 1842648707}
   references:
