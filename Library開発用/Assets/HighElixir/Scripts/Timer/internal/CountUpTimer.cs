@@ -11,8 +11,8 @@ namespace HighElixir.Timers.Internal
 
         public override bool IsFinished => false;
 
-        public CountUpTimer(Action onReset = null)
-            : base(onReset)
+        public CountUpTimer(Timer parent, Action onReset = null)
+            : base(parent, onReset)
         {
             InitialTime = 0f;
         }

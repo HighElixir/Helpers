@@ -1,6 +1,5 @@
 ﻿using HighElixir.Timers.Internal;
 using System;
-using UnityEngine;
 
 namespace HighElixir.Timers
 {
@@ -40,6 +39,15 @@ namespace HighElixir.Timers
             _timers[t] = GetTimer(type, pulseInterval, onPulse);
             return t;
         }
+        
+        public TimerTicket Restore(TimerSnapshot snapshot)
+        {
+            var ticket = TimerTicket.Take(snapshot.Key);
+            var timer = GetTimer(snapshot.CountType, snapshot.Initialize);
+            timer.Current = snapshot.Current;
+            _timers[ticket] = timer;
+            return ticket;
+        }
 
         /// <summary>
         /// 登録解除。存在しなければ false。
@@ -52,20 +60,20 @@ namespace HighElixir.Timers
             if (!type.Has(CountType.Tick))
             {
                 if (type.Has(CountType.CountDown))
-                    timer = new CountDownTimer(arg, action);
+                    timer = new CountDownTimer(arg, this, action);
                 else if (type.Has(CountType.CountUp))
-                    timer = new CountUpTimer(action);
+                    timer = new CountUpTimer(this, action);
                 else
-                    timer = new PulseTimer(arg, action);
+                    timer = new PulseTimer(arg, this, action);
             }
             else
             {
                 if (type.Has(CountType.CountDown))
-                    timer = new TickCountDownTimer(arg, action);
+                    timer = new TickCountDownTimer(arg, this, action);
                 else if (type.Has(CountType.CountUp))
-                    timer = new TickCountUpTimer(action);
+                    timer = new TickCountUpTimer(this, action);
                 else
-                    timer = new TickPulseTimer(arg, action);
+                    timer = new TickPulseTimer(arg, this, action);
             }
             timer.Initialize();
             return timer;

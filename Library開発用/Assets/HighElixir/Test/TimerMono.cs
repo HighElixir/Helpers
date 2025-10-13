@@ -62,13 +62,10 @@ namespace HighElixir.Test
                 Debug.Log("CountUp reseted");
                 GlobalTimer.FixedUpdate.Start(_ticketHolder[nameof(_countUpInterval)], isLazy: false);
             });
-            if (GlobalTimer.FixedUpdate.TryGetIObservable(_ticketHolder[_id], out var observable))
-            {
-                observable.Subscribe(time =>
+            GlobalTimer.FixedUpdate.GetReactiveProperty(_ticketHolder[_id])?.Subscribe(time =>
                 {
                     _text.SetText($"Time : {time:0.00} s");
                 });
-            }
             //// タイマー開始
             GlobalTimer.Update.Start(_ticketHolder[nameof(_countDown)]);
             GlobalTimer.Update.Start(_ticketHolder[nameof(_countDown2)]);

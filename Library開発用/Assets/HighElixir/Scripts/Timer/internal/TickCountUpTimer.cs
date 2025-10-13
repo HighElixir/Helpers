@@ -6,7 +6,7 @@ namespace HighElixir.Timers.Internal
     {
         public override CountType CountType => base.CountType | CountType.Tick;
 
-        public TickCountUpTimer(Action onReset) : base(onReset) { }
+        public TickCountUpTimer(Timer parent, Action onReset = null) : base(parent, onReset) { }
         public override void Update(float _)
         {
             base.Update(1);

@@ -10,8 +10,8 @@ namespace HighElixir.Timers.Internal
 
         public override bool IsFinished => Current <= 0 && !IsRunning;
 
-        public CountDownTimer(float duration, Action onFinished = null) :
-            base(onFinished)
+        public CountDownTimer(float duration, Timer parent, Action onFinished = null) :
+            base(parent, onFinished)
         {
             if (duration <= 0f) throw new ArgumentOutOfRangeException(nameof(duration));
             InitialTime = duration;

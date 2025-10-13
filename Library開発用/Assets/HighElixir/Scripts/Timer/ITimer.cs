@@ -1,8 +1,8 @@
 ﻿using System;
 
-namespace HighElixir.Timers.Internal
+namespace HighElixir.Timers
 {
-    internal interface ITimer : IDisposable
+    public interface ITimer : IDisposable
     {
         /// <summary>
         /// Reset時に戻る時間
@@ -22,7 +22,7 @@ namespace HighElixir.Timers.Internal
         event Action OnFinished;
         void Initialize(); // 初期化
         void Start();
-        void Stop();
+        float Stop();
         void Reset();
 
         // リセット=>スタートの順に実行

@@ -4,7 +4,7 @@ namespace HighElixir.Timers.Internal
 {
     internal sealed class ReadOnlyTimer : IReadOnlyTimer
     {
-        private readonly IReadOnlyTimer _timer;
+        private IReadOnlyTimer _timer;
         internal ReadOnlyTimer(IReadOnlyTimer timer)
         {
             _timer = timer;
@@ -14,6 +14,11 @@ namespace HighElixir.Timers.Internal
         public IEnumerable<TimerSnapshot> GetSnapshot()
         {
             return _timer.GetSnapshot();
+        }
+
+        public void Dispose()
+        {
+            _timer = null;
         }
     }
 }

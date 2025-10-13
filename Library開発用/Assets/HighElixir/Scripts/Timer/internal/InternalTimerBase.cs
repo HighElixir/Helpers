@@ -1,4 +1,5 @@
-﻿using System;
+﻿using HighElixir.Implements;
+using System;
 using System.Collections.Generic;
 
 namespace HighElixir.Timers.Internal
@@ -54,8 +55,8 @@ namespace HighElixir.Timers.Internal
         protected Reactive _reactive;
         private readonly object _lock = new();
         private float _current;
-        public float InitialTime { get; set; }
-        public float Current
+        public virtual float InitialTime { get; set; }
+        public virtual float Current
         {
             get
             {
@@ -76,8 +77,8 @@ namespace HighElixir.Timers.Internal
 
         public event Action OnFinished; // null 許容
 
-
-        public InternalTimerBase(Action onFinished = null)
+        private Timer _timer;
+        public InternalTimerBase(Timer parent, Action onFinished = null)
         {
             if (onFinished != null) OnFinished += onFinished;
             _reactive = new(InitialTime);
@@ -97,11 +98,14 @@ namespace HighElixir.Timers.Internal
         public virtual void Start()
         {
             IsRunning = true;
+            if (IsFinished)
+                Reset();
         }
 
-        public virtual void Stop()
+        public virtual float Stop()
         {
             IsRunning = false;
+            return Current;
         }
         public void Restart()
         {
@@ -121,7 +125,7 @@ namespace HighElixir.Timers.Internal
                 }
                 catch (Exception ex)
                 {
-                    UnityEngine.Debug.LogError($"[HighElixir.Timers] Timer OnFinished callback threw an exception: {ex}");
+                    OnError(ex);
                 }
             }
         }
@@ -130,6 +134,11 @@ namespace HighElixir.Timers.Internal
         {
             _reactive.Dispose();
             OnFinished = null;
+        }
+
+        public void OnError(System.Exception exception)
+        {
+            _timer?.OnError(exception);
         }
     }
 }

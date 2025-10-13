@@ -5,7 +5,7 @@ namespace HighElixir.Timers.Internal
     internal sealed class TickCountDownTimer : CountDownTimer
     {
         public override CountType CountType => base.CountType | CountType.Tick;
-        public TickCountDownTimer(float duration, Action onFinished) : base(duration, onFinished) { }
+        public TickCountDownTimer(float duration, Timer parent, Action onFinished = null) : base(duration, parent, onFinished) { }
 
         public override void Update(float _)
         {

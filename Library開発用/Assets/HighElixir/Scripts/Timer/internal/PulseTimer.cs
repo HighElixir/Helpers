@@ -5,24 +5,47 @@ namespace HighElixir.Timers.Internal
     internal class PulseTimer : InternalTimerBase
     {
         private int _pulseCount = 0;
+        public override float InitialTime
+        {
+            get
+            {
+                return base.InitialTime;
+            }
+            set
+            {
+                base.InitialTime = value;
+                CalcPulse();
+            }
+        }
         public override float NormalizedElapsed
         {
             get
             {
                 float ratio = (Current - InitialTime * _pulseCount) / InitialTime;
                 ratio = ratio < 0f ? 0f : (ratio > 1f ? 1f : ratio);
-                return  ratio;
+                return ratio;
             }
         }
 
-
+        public override float Current
+        {
+            get
+            {
+                return base.Current;
+            }
+            set
+            {
+                base.Current = value;
+                CalcPulse();
+            }
+        }
         public override CountType CountType => CountType.Pulse;
 
         public override bool IsFinished => false;
 
         public int PulseCount => _pulseCount;
-        public PulseTimer(float pulseInterval, Action onPulse = null)
-            : base(onPulse)
+        public PulseTimer(float pulseInterval, Timer parent, Action onPulse = null)
+            : base(parent, onPulse)
         {
             InitialTime = pulseInterval;
         }
@@ -49,6 +72,11 @@ namespace HighElixir.Timers.Internal
                 EventInvokeSafely();
                 _pulseCount++;
             }
+        }
+
+        private void CalcPulse()
+        {
+            _pulseCount = (int)Math.Ceiling(Current / InitialTime);
         }
     }
 }

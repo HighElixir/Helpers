@@ -1,9 +1,7 @@
-﻿// エディタ監視用のスナップショット。
-using System;
+﻿using System;
 
 namespace HighElixir.Timers
 {
-    // TODO : スナップショットから復元する機能の実装
     [Serializable]
     public readonly struct TimerSnapshot
     {
@@ -17,17 +15,18 @@ namespace HighElixir.Timers
         public readonly bool IsFinished;
         public readonly CountType CountType;
         public readonly float Optional; // PulseTypeのパルス数などを保存
-        public TimerSnapshot(string parentName,TimerTicket ticket, float initialize, float current, float normalized, bool isRunning, bool isFinished, CountType countType, float optional = -1)
+
+        public TimerSnapshot(string parentName,TimerTicket ticket, ITimer timer, float optional = -1)
         {
             ParentName = parentName;
             Key = ticket.Key;
             Name = ticket.Name;
-            Initialize = initialize;
-            Current = current;
-            NormalizedElapsed = normalized;
-            IsRunning = isRunning;
-            IsFinished = isFinished;
-            CountType = countType;
+            Initialize = timer.InitialTime;
+            Current = timer.Current;
+            NormalizedElapsed = timer.NormalizedElapsed;
+            IsRunning = timer.IsRunning;
+            IsFinished = timer.IsFinished;
+            CountType = timer.CountType;
             Optional = optional;
         }
     }
