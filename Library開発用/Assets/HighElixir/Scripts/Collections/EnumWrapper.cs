@@ -1,56 +1,33 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Security.Cryptography;
 
 namespace HighElixir
 {
     public static class EnumWrapper
     {
-        // おそらく重いので乱用は控える
-        /// <typeparam name="T">enum</typeparam>
-        /// <returns>特定の列挙型の全ての値を格納したリスト</returns>
-        public static List<T> GetEnumList<T>(bool skippingNone = true) where T : Enum
-        {
-            var res = GetEnumerable<T>().ToList();
-            if (skippingNone)
-                res.RemoveAll(x => x.ToString().Contains("None", StringComparison.OrdinalIgnoreCase));
-            return res;
-        }
+        public static IReadOnlyList<T> GetEnumList<T>(bool skipDefault = true) where T : struct, Enum =>
+            GetEnumerable<T>(skipDefault).ToList();
 
-        public static HashSet<T> GetEnumHashSet<T>(bool skippingNone = true) where T : Enum
-        {
-            var res = GetEnumerable<T>().ToHashSet();
-            if (skippingNone)
-                res.RemoveWhere(x => x.ToString().Contains("None", StringComparison.OrdinalIgnoreCase));
-            return res;
-        }
+        public static HashSet<T> GetEnumHashSet<T>(bool skipDefault = true) where T : struct, Enum =>
+            GetEnumerable<T>(skipDefault).ToHashSet();
 
-        public static List<string> GetEnumNames<T>(bool skippingNone = true) where T : Enum
-        {
-            var res = Enum.GetNames(typeof(T)).ToList();
-            if (skippingNone)
-                res.RemoveAll(x => x.Contains("None", StringComparison.OrdinalIgnoreCase));
-            return res;
-        }
-        public static Dictionary<T, string> GetDict<T>() where T : Enum
-        {
-            var values = GetEnumerable<T>();
-            var names = GetEnumNames<T>();
-            var dict = new Dictionary<T, string>();
-            int i = 0;
-            foreach (var v in values)
-            {
-                dict[v] = names[i];
-                i++;
-            }
-            return dict;
-        }
+        public static IReadOnlyList<string> GetEnumNames<T>(bool skipDefault = true) where T : struct, Enum =>
+            GetEnumerable<T>(skipDefault).Select(v => Enum.GetName(typeof(T), v)!).ToList();
 
-        private static IEnumerable<T> GetEnumerable<T>()
-            where T : Enum
+        public static Dictionary<T, string> GetValueNameMap<T>(bool skipDefault = true) where T : struct, Enum =>
+            GetEnumerable<T>(skipDefault).ToDictionary(v => v, v => Enum.GetName(typeof(T), v)!);
+
+        public static IEnumerable<T> GetEnumerable<T>(bool skipDefault) where T : struct, Enum
         {
-            return Enum.GetValues(typeof(T)).Cast<T>();
+#if NET5_0_OR_GREATER
+            var values = Enum.GetValues<T>();
+#else
+            var values = (T[])Enum.GetValues(typeof(T));
+#endif
+            return skipDefault
+                ? values.Where(v => Convert.ToInt64(v) != 0) // “0=デフォルト(None)” を除外
+                : values;
         }
     }
 }

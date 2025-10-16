@@ -9,12 +9,13 @@ namespace HighElixir.Timers
         /// <summary>
         /// カウントダウンタイマーの登録
         /// </summary>
-        public TimerTicket CountDownRegister(float duration, string name = "", Action onFinished = null, bool isTick = false)
+        public TimerTicket CountDownRegister(float duration, string name = "", Action onFinished = null, bool isTick = false, bool initZero = false)
         {
             var t = TimerTicket.Take(name);
             if (duration < 0f) duration = 1f;
             var type = CountType.CountDown | (isTick ? CountType.Tick : CountType.Invalid);
             _timers[t] = GetTimer(type, duration, onFinished);
+            _timers[t].Current = 0;
             return t;
         }
         /// <summary>
@@ -52,7 +53,16 @@ namespace HighElixir.Timers
         /// <summary>
         /// 登録解除。存在しなければ false。
         /// </summary>
-        public bool Unregister(TimerTicket ticket) => _timers.Remove(ticket);
+        public bool Unregister(TimerTicket ticket)
+        {
+            if (_timers.TryGetValue(ticket, out var timer))
+            {
+                timer.Dispose();
+                _timers.Remove(ticket);
+                return true;
+            }
+            return false;
+        }
 
         private ITimer GetTimer(CountType type, float arg, Action action = null)
         {

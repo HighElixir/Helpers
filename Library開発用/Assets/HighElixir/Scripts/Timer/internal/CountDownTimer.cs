@@ -13,7 +13,7 @@ namespace HighElixir.Timers.Internal
         public CountDownTimer(float duration, Timer parent, Action onFinished = null) :
             base(parent, onFinished)
         {
-            if (duration <= 0f) throw new ArgumentOutOfRangeException(nameof(duration));
+            if (duration <= 0f) OnError(new ArgumentOutOfRangeException(nameof(duration)));
             InitialTime = duration;
         }
 
@@ -23,8 +23,11 @@ namespace HighElixir.Timers.Internal
             if (dt <= 0f) return; // 負やゼロを無視
 
             var next = Current - dt;
-            Current = next;
-            if (Current >= 0f) return;
+            if (next >= 0f)
+            {
+                Current = next;
+                return;
+            }
             // ちょうど/下回った → 0 に丸め、完了を 1 回だけ通知
             Current = 0f;
             Stop();

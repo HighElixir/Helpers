@@ -12,7 +12,7 @@ namespace HighElixir.Timers.Internal
             private readonly static float Threshold = 0.0005f;
             private readonly HashSet<IObserver<float>> _observers;
 
-            private  float _before;
+            private float _before;
 
             public Reactive(float before = 0, HashSet<IObserver<float>> observers = null)
             {
@@ -26,15 +26,18 @@ namespace HighElixir.Timers.Internal
                 return Disposable.Create(() => Dispose_Internal(observer));
             }
 
-            internal void Notify(float newAmount)
+            internal void Notify(float newAmount, bool notify = true)
             {
                 float abs = Math.Abs(newAmount - _before);
                 if (abs > Threshold)
                 {
                     _before = newAmount;
-                    foreach (var observer in _observers)
+                    if (notify)
                     {
-                        observer.OnNext(_before);
+                        foreach (var observer in _observers)
+                        {
+                            observer.OnNext(abs);
+                        }
                     }
                 }
             }
@@ -43,8 +46,9 @@ namespace HighElixir.Timers.Internal
             {
                 foreach (var observer in _observers)
                 {
-                    Dispose_Internal(observer);
+                    observer.OnCompleted();
                 }
+                _observers.Clear();
             }
             private void Dispose_Internal(IObserver<float> observer)
             {
@@ -65,10 +69,10 @@ namespace HighElixir.Timers.Internal
             set
             {
                 _current = value;
-                _reactive.Notify(_current);
+                _reactive.Notify(_current, IsRunning);
             }
         }
-        public bool IsRunning { get; protected set; }
+        public bool IsRunning { get; protected set; } = false;
         public abstract float NormalizedElapsed { get; }
         public abstract bool IsFinished { get; }
         public abstract CountType CountType { get; }
@@ -97,9 +101,9 @@ namespace HighElixir.Timers.Internal
 
         public virtual void Start()
         {
-            IsRunning = true;
             if (IsFinished)
                 Reset();
+            IsRunning = true;
         }
 
         public virtual float Stop()
