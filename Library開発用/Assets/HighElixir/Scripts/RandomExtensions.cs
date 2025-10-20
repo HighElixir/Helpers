@@ -9,16 +9,25 @@ namespace HighElixir
     internal static class RandomProvider
     {
         private static int _seed = Environment.TickCount;
-        private static readonly ThreadLocal<Random> _local =
+        private static ThreadLocal<Random> _local =
             new ThreadLocal<Random>(() => new Random(Interlocked.Increment(ref _seed)));
 
         public static Random Instance => _local.Value;
+
+        internal static void ResetSeed(int newSeed)
+        {
+            _seed = newSeed;
+            _local.Dispose();
+            _local = new ThreadLocal<Random>(() => new Random(Interlocked.Increment(ref _seed)));
+
+        }
     }
 
     public static class RandomExtensions
     {
+        #region 確率判定
         /// <summary>
-        /// 確率[0,1]で true。RNG を明示注入する版。
+        /// 確率[0,1]で true。
         /// </summary>
         public static bool Chance(this Random random, double probability)
         {
@@ -30,40 +39,43 @@ namespace HighElixir
         }
 
         /// <summary>
-        /// float 版（内部は double に委譲）
-        /// </summary>
-        public static bool Chance(this Random random, float probability)
-            => random.Chance((double)probability);
-
-        /// <summary>
-        /// 共有RNG代替（スレッドローカル）を使う簡易版。
-        /// </summary>
-        public static bool Chance(double probability)
-            => RandomProvider.Instance.Chance(probability);
-
-        /// <summary>
         /// パーセント指定（0〜100）
         /// </summary>
         public static bool Percent(this Random random, double percent)
             => random.Chance(percent / 100.0);
+        #endregion
 
+        #region 共有RNG代替（スレッドローカル）
+        /// <summary>
+        /// 確率[0,1]で true。（共有RNG代替）
+        /// </summary>
+        public static bool Chance(double probability)
+            => RandomProvider.Instance.Chance(probability);
         /// <summary>
         /// パーセント指定（共有RNG代替）
         /// </summary>
         public static bool Percent(double percent)
             => RandomProvider.Instance.Chance(percent / 100.0);
 
+        /// <summary>
+        /// Min 〜 Max の範囲でランダムな整数を返す。(Maxを含む)
+        /// </summary>
         public static int Rand(int min, int max)
-            => RandomProvider.Instance.Next(min, max);
+            => RandomProvider.Instance.Next(min, max + 1);
         public static double Rand(double min, double max)
         {
             if (double.IsNaN(min) || double.IsNaN(max)) return double.NaN;
             if (min == max) return min;
             if (min > max) { var t = min; min = max; max = t; }
 
-            var u = RandomProvider.Instance.NextDouble();  // [0,1)
-            return u * (max - min) + min;                  // [min, max)
+            var u = RandomProvider.Instance.NextDouble();
+            return min + (max - min) * u; // [min, max)
         }
-        public static float Rand(float min, float max) => (float)Rand((double)min, (double)max);
+        #endregion
+
+        #region シードリセット
+        public static void ResetRandomSeed(int newSeed)
+            => RandomProvider.ResetSeed(newSeed);
+        #endregion
     }
 }

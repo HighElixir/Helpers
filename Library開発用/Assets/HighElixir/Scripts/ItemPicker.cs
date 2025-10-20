@@ -43,7 +43,7 @@ namespace HighElixir
         /// 特定の大きさを超過したアイテムをすべて返す.
         /// </summary>
         /// <param name="allowSize">許可されるリストの大きさ</param>
-        /// <param name="res"><ass cref="allowSize">allowSize</cref>を超過したアイテム</param>
+        /// <param name="res">最大許容量を超過したアイテム</param>
         /// <returns>超過していたかどうか</returns>
         public static bool TryGetOverItem<T>(this List<T> list, int allowSize, out List<T> res)
         {
@@ -56,6 +56,7 @@ namespace HighElixir
                 {
                     res.Add(list[index - i]);
                 }
+                res.Reverse();
                 return true;
             }
             return false;

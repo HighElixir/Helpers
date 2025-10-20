@@ -17,6 +17,10 @@ namespace HighElixir
 
         public static Dictionary<T, string> GetValueNameMap<T>(bool skipDefault = true) where T : struct, Enum =>
             GetEnumerable<T>(skipDefault).ToDictionary(v => v, v => Enum.GetName(typeof(T), v)!);
+        public static Dictionary<string, T> GetNameValueMap<T>(bool skipDefault = true)
+    where T : struct, Enum =>
+    GetEnumerable<T>(skipDefault)
+        .ToDictionary(v => Enum.GetName(typeof(T), v)!, v => v);
 
         public static IEnumerable<T> GetEnumerable<T>(bool skipDefault) where T : struct, Enum
         {
