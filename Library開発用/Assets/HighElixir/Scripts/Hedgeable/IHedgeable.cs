@@ -7,7 +7,7 @@ namespace HighElixir.Hedgeable
     /// </summary>
     public interface IHedgeable<T, TSelf>
         where TSelf : IHedgeable<T, TSelf>
-        where T : IComparable<T>, IEquatable<T>
+        where T : struct, IComparable<T>, IEquatable<T>
     {
         /// <summary>
         /// ヘッジ可能な値を取得する。

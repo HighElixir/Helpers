@@ -6,26 +6,27 @@ namespace HighElixir.Hedgeable
     /// <summary>
     /// 特定の範囲内で値を変化させることができる int 型のラッパー。
     /// </summary>
-    public class HedgeableInt : IHedgeable<int, HedgeableInt>
+    public struct Hedgeable<T> : IHedgeable<T, Hedgeable<T>>
+        where T : struct, IComparable<T>, IEquatable<T>
     {
-        private int _value;
-        private int _minValue = int.MinValue;
-        private int _maxValue = int.MaxValue;
+        private T _value;
+        private T _minValue;
+        private T _maxValue;
         // -1 ならば負方向、+1 ならば正方向、0 ならば変化なし
-        private int _direction = 0;
-        private Action<int, int> _onHedge;
-        public int Value
+        private int _direction;
+        private Action<T, T> _onHedge;
+        public T Value
         {
             get => _value;
             set
             {
                 var oldValue = _value;
-                if (value > _maxValue)
+                if (value.CompareTo(_maxValue) > 0)
                 {
                     _value = _maxValue;
                     _onHedge?.Invoke(oldValue, _value);
                 }
-                else if (value < _minValue)
+                else if (value.CompareTo(_minValue) < 0)
                 {
                     _value = _minValue;
                     _onHedge?.Invoke(oldValue, _value);
@@ -35,7 +36,12 @@ namespace HighElixir.Hedgeable
                     _value = value;
                 }
                 // Direction の更新
-                int diff = _value - oldValue;
+                int diff = _value.CompareTo(oldValue);
+                if (diff > 0)
+                {
+                    Direction = 1;
+                    return;
+                }
                 Direction = diff;
             }
         }
@@ -47,52 +53,54 @@ namespace HighElixir.Hedgeable
             get => _direction;
             private set => _direction = (value == 0) ? 0 : value / Math.Abs(value);
         }
-        public int MinValue => _minValue;
-        public int MaxValue => _maxValue;
-        public HedgeableInt(int initialValue = 0)
-        {
-            Value = initialValue;
-        }
-        public HedgeableInt(int minValue, int maxValue, int initialValue = 0)
+        public T MinValue => _minValue;
+        public T MaxValue => _maxValue;
+
+        public Hedgeable(T initialValue, T minValue, T maxValue, Action<T, T> onHedge = null)
         {
             _minValue = minValue;
             _maxValue = maxValue;
-            Value = initialValue;
+            _value = initialValue;
+            _direction = 0;
+            _onHedge = onHedge;
         }
 
-        public HedgeableInt SetMax(int maxValue)
+
+        public Hedgeable<T> SetMax(T maxValue)
         {
             _maxValue = maxValue;
-            if (_value > _maxValue)
+            if (_value.CompareTo(_maxValue) > 0)
             {
                 Value = _maxValue;
             }
             return this;
         }
-        public HedgeableInt SetMin(int minValue)
+        public Hedgeable<T> SetMin(T minValue)
         {
             _minValue = minValue;
-            if (_value < _minValue)
+            if (_value.CompareTo(_minValue) < 0)
             {
                 Value = _minValue;
             }
             return this;
         }
-        public IDisposable Subscribe(Action<int, int> onHedge)
+        public IDisposable Subscribe(Action<T, T> onHedge)
         {
             _onHedge = onHedge;
-            return Disposable.Create(() => _onHedge = null);
+            var ac = _onHedge;
+            return Disposable.Create(() => ac -= onHedge);
         }
 
-        public bool CanSetValue(int newValue)
+        public bool CanSetValue(T newValue)
         {
-            return newValue >= _minValue && newValue <= _maxValue;
+            return newValue.CompareTo(_minValue) >= 0 && newValue.CompareTo(_maxValue) <= 0;
         }
+
 
         public override string ToString()
         {
             return _value.ToString();
         }
-        public static implicit operator int(HedgeableInt h) => h.Value;
+        public static implicit operator T(Hedgeable<T> h) => h.Value;
     }
 }

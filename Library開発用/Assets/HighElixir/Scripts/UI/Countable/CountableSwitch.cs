@@ -34,7 +34,7 @@ namespace HighElixir.UI.Countable
         [Header("Data")]
         [SerializeField] private int _defaultAmount = 0;
         [SerializeField] private int _oneClickChange = 1;
-        private HedgeableInt _value;
+        private Hedgeable<int> _value;
         private int min = int.MinValue;
         private int max = int.MaxValue;
 
@@ -91,9 +91,7 @@ namespace HighElixir.UI.Countable
             _audioSource.playOnAwake = false;
 
             // 初期値セット
-            _value = new HedgeableInt(_defaultAmount)
-                .SetMin(min)
-                .SetMax(max);
+            _value = new Hedgeable<int>(_defaultAmount, min, max);
             var d = _value.Subscribe((x, _) => _text.text = x.ToString()).AddTo(this);
             _text.text = _value.ToString();
             this.OnDestroyAsObservable().Subscribe(_ =>
