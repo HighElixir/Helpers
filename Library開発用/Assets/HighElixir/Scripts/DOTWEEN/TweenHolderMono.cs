@@ -116,7 +116,7 @@ namespace HighElixir.Tweenworks
                 if (string.IsNullOrWhiteSpace(item.Name))
                     item.Name = "New Profiler";
 
-                var key = item.Name.RemovePlusNumberTags().Trim();
+                var key = item.Name.RemoveNumericTags().Trim();
                 Debug.Log($"key:{key}, name:{item.Name}");
                 if (!dic.TryAdd(key, 0))
                 {

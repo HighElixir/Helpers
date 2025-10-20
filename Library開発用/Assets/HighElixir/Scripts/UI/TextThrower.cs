@@ -19,8 +19,20 @@ namespace HighElixir.UI
         [SerializeField] private RectTransform _container;
 
         [Header("Options")]
-        [SerializeField] private Vector3 _endPosDelta = new Vector3(0, 2.5f, 0);
+        [Tooltip("テキストの持続時間")]
         [SerializeField] private float _duration = 1f;
+        [Tooltip("テキストの移動量")]
+        [SerializeField] private Vector3 _endPosDelta = new Vector3(0, 2.5f, 0);
+
+        [Header("Font Size Change")]
+        [Tooltip("文字の大きさ変化を有効にするか")]
+        [SerializeField] private bool _enableFontSizeChange = true;
+        [Tooltip("最初のテキストの大きさ倍率")]
+        [SerializeField] private float _startFontSizeScale = 1.7f;
+        [Tooltip("最後のテキストの大きさ倍率")]
+        [SerializeField] private float _endFontSizeScale = 0.5f;
+        [Tooltip("文字の大きさ変化のイージング")]
+        [SerializeField] private Ease _fontSizeEase = Ease.OutQuad;
 
         private ObjectPool<TMP_Text> _pool;
         private Dictionary<TMP_Text, Sequence> _sequences;
@@ -37,17 +49,7 @@ namespace HighElixir.UI
             }
             else
             {
-                // ワールド位置→スクリーン座標
-                Vector2 screenPos = RectTransformUtility.WorldToScreenPoint(_camera, go.transform.position);
-                // スクリーン座標→UI ローカル座標
-                bool ok = RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                    UiParentRect,
-                    screenPos,
-                    uiCanvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : _camera,
-                    out localPos
-                );
-                if (!ok)
-                    Debug.LogWarning("スクリーン→ローカル変換に失敗したよ！");
+                localPos = ScreenHelpers.WorldToUILocalPos(go.transform.position, _camera, uiCanvas);
             }
 
             return Create(localPos, Quaternion.identity, text, color);
@@ -56,7 +58,7 @@ namespace HighElixir.UI
         // Vector2 版
         public TMP_Text Create(Vector2 pos, Quaternion rotation, string text, Color color)
         {
-            var t = _pool.Get();
+            var t = ((Pool<TMP_Text>)_pool).Get();
             var r = t.GetComponent<RectTransform>();
             r.SetParent(UiParentRect, false);
             r.anchoredPosition = pos;
@@ -69,6 +71,13 @@ namespace HighElixir.UI
             seq.Append(r.DOAnchorPos3D((Vector3)pos + _endPosDelta, _duration).SetEase(Ease.Linear))
                .Join(t.DOFade(0f, _duration))
                .OnComplete(() => Release(t));
+            if (_enableFontSizeChange)
+            {
+                float startSize = t.fontSize * _startFontSizeScale;
+                float endSize = t.fontSize * _endFontSizeScale;
+                t.fontSize = startSize;
+                seq.Join(DOTween.To(() => t.fontSize, x => t.fontSize = x, endSize, _duration).SetEase(_fontSizeEase));
+            }
 
             _sequences[t] = seq;
             return t;
@@ -78,7 +87,7 @@ namespace HighElixir.UI
 
         public TMP_Text Get()
         {
-            return _pool.Get();
+            return ((Pool<TMP_Text>)_pool).Get();
         }
         public void Release(TMP_Text text)
         {
@@ -89,11 +98,13 @@ namespace HighElixir.UI
                 _sequences.Remove(text);
 
                 // 初期化
-                text.rectTransform.sizeDelta = _prefab.rectTransform.sizeDelta;
+                if (!_prefab.enableAutoSizing)
+                    text.rectTransform.sizeDelta = _prefab.rectTransform.sizeDelta;
+
                 text.rectTransform.localScale = _prefab.rectTransform.localScale;
                 text.rectTransform.rotation = _prefab.rectTransform.rotation;
             }
-            _pool.Release(text);
+            ((Pool<TMP_Text>)_pool).Release(text);
         }
         private void Awake()
         {

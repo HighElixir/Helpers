@@ -173,7 +173,11 @@ namespace HighElixir.Timers
                     OnError(new ArgumentException("CountDownRegister: duration は 0 以上である必要があります。"));
                     return default;
                 }
-                return Register_Internal(CountType.CountDown, name, duration, isTick, onFinished, andStart);
+                var res = Register_Internal(CountType.CountDown, name, duration, isTick, onFinished, andStart);
+                GetTimerSafety(res, out var t);
+                if (initZero)
+                    t.Current = 0f;
+                return res;
             }
         }
         /// <summary>
