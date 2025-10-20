@@ -1,5 +1,5 @@
 ﻿using DG.Tweening;
-using HighElixir.Pool;
+using HighElixir.Pools;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
@@ -22,7 +22,7 @@ namespace HighElixir.UI
         [SerializeField] private Vector3 _endPosDelta = new Vector3(0, 2.5f, 0);
         [SerializeField] private float _duration = 1f;
 
-        private Pool<TMP_Text> _pool;
+        private ObjectPool<TMP_Text> _pool;
         private Dictionary<TMP_Text, Sequence> _sequences;
 
         private RectTransform UiParentRect => uiCanvas.transform as RectTransform;
@@ -98,7 +98,7 @@ namespace HighElixir.UI
         private void Awake()
         {
             if (_container == null) _container = transform.GetComponent<RectTransform>();
-            _pool = new Pool<TMP_Text>(_prefab, _poolSize, _container);
+            _pool = new ObjectPool<TMP_Text>(_prefab, _poolSize, _container);
             _sequences = new Dictionary<TMP_Text, Sequence>();
         }
         private void OnDestroy()

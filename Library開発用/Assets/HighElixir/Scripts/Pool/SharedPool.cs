@@ -1,18 +1,18 @@
 ﻿using UnityEngine;
 
-namespace HighElixir.Pool
+namespace HighElixir.Pools
 {
     public abstract class SharedPool<T> : SingletonBehavior<SharedPool<T>>
-        where T : MonoBehaviour
+        where T : UnityEngine.Object
     {
         [Header("PoolSettings")]
         [SerializeField] private T _pref;
         [SerializeField] private int _capacity;
         [SerializeField] private bool _lazy = true;
 
-        private Pool<T> _pool;
+        private ObjectPool<T> _pool;
 
-        public Pool<T> Pool => _pool;
+        public ObjectPool<T> Pool => _pool;
 
         protected override void Awake()
         {
