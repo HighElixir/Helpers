@@ -10,6 +10,7 @@ namespace HighElixir.Editors
         [MenuItem("HighElixir/RenameAssets")]
         public static void Rename()
         {
+            int succesed = 0, failed = 0;
             foreach (var obj in Selection.objects)
             {
                 string path = AssetDatabase.GetAssetPath(obj);
@@ -26,6 +27,7 @@ namespace HighElixir.Editors
                         if (string.IsNullOrEmpty(value))
                         {
                             Debug.LogWarning($"⚠ {obj.name} の {field.Name} が空です。スキップします。");
+                            failed++;
                             continue;
                         }
 
@@ -35,12 +37,19 @@ namespace HighElixir.Editors
                         {
                             string error = AssetDatabase.RenameAsset(path, set);
                             if (string.IsNullOrEmpty(error))
+                            {
                                 Debug.Log($"✅ {currentName} → {set} にリネームしました！");
+                                succesed++;
+                            }
                             else
+                            {
                                 Debug.LogError($"❌ {obj.name} のリネームに失敗: {error}");
+                                failed++;
+                            }
                         }
                     }
                 }
+                Debug.Log($"[FileRename] 成功:{succesed} 失敗:{failed}");
             }
 
             AssetDatabase.SaveAssets();

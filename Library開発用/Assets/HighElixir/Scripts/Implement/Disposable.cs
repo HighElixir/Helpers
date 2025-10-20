@@ -2,7 +2,7 @@
 
 namespace HighElixir.Implements
 {
-    internal static class Disposable
+    public static class Disposable
     {
         private class ActionDisposable : IDisposable
         {

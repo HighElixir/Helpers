@@ -7,7 +7,6 @@ namespace HighElixir.Timers
 {
     public static class GlobalTimer
     {
-        private class GlobalFiexedTimer { }
         internal class Wrapper
         {
             public readonly Lazy<Timer> Timer;
@@ -19,8 +18,8 @@ namespace HighElixir.Timers
             }
         }
 
-        internal static readonly Wrapper update = new Wrapper(nameof(GlobalTimer));
-        internal static readonly Wrapper fixedUpdate = new Wrapper(nameof(GlobalFiexedTimer));
+        internal static readonly Wrapper update = new Wrapper("GlobalTimer");
+        internal static readonly Wrapper fixedUpdate = new Wrapper("GlobalFixedTimer");
 
         public static Timer Update => update.Instance;
         public static Timer FixedUpdate => fixedUpdate.Instance;
@@ -38,10 +37,7 @@ namespace HighElixir.Timers
         {
             Application.quitting += () =>
             {
-                if (update.IsCreated)
-                    update.Timer.Value.Dispose();
-                if (fixedUpdate.IsCreated)
-                    fixedUpdate.Timer.Value.Dispose();
+                Timer.DisposeAll();
             };
             CreateObj();
         }

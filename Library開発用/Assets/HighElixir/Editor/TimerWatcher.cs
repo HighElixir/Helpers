@@ -42,12 +42,8 @@ namespace HighElixir.Editors
         private SortMode _sortMode = SortMode.ParentType;
         private bool _sortAscending = true;
         private Vector2 _scroll;
-        private Color _currentColor = Color.clear;
-        private string _lastParentType = null;
 
         private readonly Dictionary<string, Color> _typeColorMap = new();
-        private string _editingColorParent = null; // ★ 編集中の親タイプ
-        private Color _editingColor;               // ★ カラーピッカーで選択中の色
 
         [MenuItem("HighElixir/Timer")]
         public static void ShowWindow()
@@ -63,12 +59,6 @@ namespace HighElixir.Editors
             if (color != default)
                 EditorGUI.DrawRect(rect, color);
 
-            // ★ Parentリンクボタン
-            if (EditorGUILayout.LinkButton(parent, GUILayout.Width(120)))
-            {
-                _editingColorParent = parent;
-                _editingColor = _typeColorMap.ContainsKey(parent) ? _typeColorMap[parent] : Color.white;
-            }
 
             EditorGUILayout.LabelField(name, GUILayout.Width(100));
             EditorGUILayout.LabelField(countType, GUILayout.Width(120));
@@ -87,36 +77,6 @@ namespace HighElixir.Editors
 
         private void OnGUI()
         {
-            // ★ カラーモーダル（最上部に表示）
-            if (!string.IsNullOrEmpty(_editingColorParent))
-            {
-                GUILayout.Space(10);
-                EditorGUILayout.BeginVertical("box");
-                GUILayout.Label($"Change color for: {_editingColorParent}", EditorStyles.boldLabel);
-
-                var newColor = EditorGUILayout.ColorField("Color", _editingColor);
-                if (newColor != _editingColor)
-                {
-                    _editingColor = newColor;
-                    _typeColorMap[_editingColorParent] = newColor;
-                }
-
-                EditorGUILayout.BeginHorizontal();
-                if (GUILayout.Button("Apply"))
-                {
-                    _typeColorMap[_editingColorParent] = _editingColor;
-                    _editingColorParent = null;
-                }
-                if (GUILayout.Button("Cancel"))
-                {
-                    _editingColorParent = null;
-                }
-                EditorGUILayout.EndHorizontal();
-
-                EditorGUILayout.EndVertical();
-                GUILayout.Space(10);
-            }
-
             _scroll = EditorGUILayout.BeginScrollView(_scroll);
 
             if (Application.isPlaying)
