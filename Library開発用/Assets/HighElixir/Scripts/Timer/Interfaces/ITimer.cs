@@ -38,10 +38,4 @@ namespace HighElixir.Timers
 
         void SetTicket(TimerTicket ticket);
     }
-
-    public interface ICountUp : ITimer { }
-
-    public interface ICountDown : ITimer { }
-
-    public interface IPulse : ITimer { }
 }

@@ -3,35 +3,42 @@ using System.Collections.Generic;
 
 namespace HighElixir.Timers.Internal
 {
-    internal sealed class TimerFactory
+    public sealed class TimerFactory
     {
-        private Timer _timer;
-        private static readonly Dictionary<CountType, Func<Timer, float, Action, ITimer>> _factory = new()
+        private readonly Timer _timer;
+        private static readonly Dictionary<CountType, Func<TimerConfig, ITimer>> _factory = new()
         {
             // カウントダウン
-            { CountType.CountDown | CountType.Tick, (timer, initTime, action) =>
-                new TickCountDownTimer(initTime, timer, action)
+            { CountType.CountDown | CountType.Tick, (cfg) =>
+                new TickCountDownTimer(cfg)
             },
-            { CountType.CountDown, (timer, initTime, action) =>
-                new CountDownTimer(initTime, timer, action)
+            { CountType.CountDown, (cfg) =>
+                new CountDownTimer(cfg)
             },
             // カウントアップ
-            { CountType.CountUp | CountType.Tick, (timer, initTime, action) =>
-                new TickCountUpTimer(timer, action)
+            { CountType.CountUp | CountType.Tick, (cfg) =>
+                new TickCountUpTimer(cfg)
             },
-            { CountType.CountUp, (timer, initTime, action) =>
-                new CountUpTimer(timer, action)
+            { CountType.CountUp, (cfg) =>
+                new CountUpTimer(cfg)
             },
             // パルスタイマー
-            { CountType.Pulse | CountType.Tick, (timer, initTime, action) =>
-                new TickPulseTimer(initTime, timer, action)
+            { CountType.Pulse | CountType.Tick, (cfg) =>
+                new TickPulseTimer(cfg)
             },
-            { CountType.Pulse, (timer, initTime, action) =>
-                 new PulseTimer(initTime, timer, action)
-            }
+            { CountType.Pulse, (cfg) =>
+                 new PulseTimer(cfg)
+            },
+            // アップアンドダウンタイマー
+            { CountType.UpAndDown | CountType.Tick, (cfg) =>
+                new TickUpAndDownTimer(cfg)
+            },
+            { CountType.UpAndDown, (cfg) =>
+                new UpAndDownTimer(cfg)
+            },
         };
 
-        public TimerFactory(Timer timer)
+        internal TimerFactory(Timer timer)
         {
             _timer = timer;
         }
@@ -39,24 +46,27 @@ namespace HighElixir.Timers.Internal
         /// <summary>
         /// 内部タイマー生成
         /// </summary>
-        public ITimer Create(CountType type, float initTime, Action action = null)
+        internal ITimer Create(CountType type, float initTime, Action action = null)
         {
-            try
+            if (_factory.TryGetValue(type, out var func))
             {
-                ITimer timer = null;
-                timer = _factory[type].Invoke(_timer, initTime, action);
+                var timer = func.Invoke(new TimerConfig( _timer, initTime, action));
                 timer.Initialize();
                 return timer;
             }
-            catch (KeyNotFoundException)
+            _timer.OnError(new InvalidOperationException($"TimerFactory: CountType '{type}' 未登録"));
+            return null;
+        }
+
+        public void Register(CountType type, Func<TimerConfig, ITimer> func)
+        {
+            if (!_factory.ContainsKey(type))
             {
-                _timer.OnError(new InvalidOperationException($"TimerFactory: CountType '{type}' に対応するタイマー生成関数が登録されていません。"));
-                return null;
+                _factory.Add(type, func);
             }
-            catch (Exception ex)
+            else
             {
-                _timer.OnError(ex);
-                return null;
+                _timer.OnError(new InvalidOperationException($"TimerFactory: CountType '{type}' は既に登録されています"));
             }
         }
     }

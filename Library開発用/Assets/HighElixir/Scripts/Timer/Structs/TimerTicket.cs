@@ -27,6 +27,7 @@ namespace HighElixir.Timers
         {
             return this.Key == other.Key;
         }
+        public override int GetHashCode() => Key?.GetHashCode() ?? 0;
 
         internal TimerTicket(string key, string name)
         {

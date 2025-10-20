@@ -2,7 +2,7 @@
 
 namespace HighElixir.Timers.Internal
 {
-    internal class PulseTimer : InternalTimerBase, IPulse
+    internal class PulseTimer : InternalTimerBase
     {
         private int _pulseCount = 0;
         public override float InitialTime
@@ -44,10 +44,10 @@ namespace HighElixir.Timers.Internal
         public override bool IsFinished => false;
 
         public int PulseCount => _pulseCount;
-        public PulseTimer(float pulseInterval, Timer parent, Action onPulse = null)
-            : base(parent, onPulse)
+        public PulseTimer(TimerConfig config)
+            : base(config)
         {
-            InitialTime = pulseInterval;
+            InitialTime = config.Duration;
         }
 
         public override void Reset()
@@ -77,6 +77,20 @@ namespace HighElixir.Timers.Internal
         private void CalcPulse()
         {
             _pulseCount = (int)Math.Ceiling(Current / InitialTime);
+        }
+    }
+    internal sealed class TickPulseTimer : PulseTimer
+    {
+        public override CountType CountType => base.CountType | CountType.Tick;
+        public TickPulseTimer(TimerConfig config)
+            : base(config)
+        {
+            InitialTime = (int)InitialTime;
+        }
+
+        public override void Update(float _)
+        {
+            base.Update(1);
         }
     }
 }

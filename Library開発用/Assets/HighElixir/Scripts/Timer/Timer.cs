@@ -3,12 +3,12 @@ using HighElixir.Timers.Internal;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net.Sockets;
 using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using static HighElixir.Timers.Internal.CommandQueue;
 
+// Timers.cs
 namespace HighElixir.Timers
 {
     /// <summary>
@@ -334,6 +334,42 @@ namespace HighElixir.Timers
 
         #endregion
 
+        #region Timerごとの独自操作
+
+        #region UpAndDown操作
+        public void ReverseDirection(TimerTicket ticket)
+        {
+            if (GetTimerSafety(ticket, out var t) && t is IUpAndDown ud)
+            {
+                ud.ReverseDirection();
+            }
+        }
+        public void SetDirection(TimerTicket ticket, bool isUp)
+        {
+            if (GetTimerSafety(ticket, out var t) && t is IUpAndDown ud)
+            {
+                ud.SetDirection(isUp);
+            }
+        }
+        public void ReverseAndStart(TimerTicket ticket)
+        {
+            if (GetTimerSafety(ticket, out var t) && t is IUpAndDown ud)
+            {
+                ud.ReverseDirection();
+                t.Start();
+            }
+        }
+        public void SetDirectionAndStart(TimerTicket ticket, bool isUp)
+        {
+            if (GetTimerSafety(ticket, out var t) && t is IUpAndDown ud)
+            {
+                ud.SetDirection(isUp);
+                t.Start();
+            }
+        }
+        #endregion
+
+        #endregion
         /// <summary>
         /// 更新処理。
         /// </summary>

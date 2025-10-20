@@ -34,9 +34,10 @@ namespace HighElixir.Timers.Internal
 
         private Timer _timer;
         private TimerTicket _timerTicket;
-        public InternalTimerBase(Timer parent, Action onFinished = null)
+        public InternalTimerBase(TimerConfig config)
         {
-            if (onFinished != null) OnFinished += onFinished;
+            _timer = config.Timer;
+            if (config.OnFinished != null) OnFinished += config.OnFinished;
             _reactive = new(0);
         }
 

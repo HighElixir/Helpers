@@ -10,6 +10,7 @@ namespace HighElixir.Timers
         CountDown = 1 << 2, // カウントダウン式
         CountUp = 1 << 3, // カウントアップ式
         Pulse = 1 << 4, // パルス
+        UpAndDown = 1 << 5, // カウントアップ＆ダウン式
     }
 
     public static class CountExtention
