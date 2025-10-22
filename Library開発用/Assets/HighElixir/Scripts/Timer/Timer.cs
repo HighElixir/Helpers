@@ -4,8 +4,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.ExceptionServices;
-using System.Threading;
-using System.Threading.Tasks;
 using static HighElixir.Timers.Internal.CommandQueue;
 
 // Timers.cs
@@ -24,9 +22,9 @@ namespace HighElixir.Timers
         private bool _disposed;
 
         // 外部
+        internal readonly object _lock = new object();
         private readonly CommandQueue _commandQueue;
         private readonly TimerFactory _timerFactory;
-        private readonly object _lock = new object();
         private readonly IReadOnlyTimer _readonlyTimer;
 
         // スナップショット管理用
@@ -64,7 +62,7 @@ namespace HighElixir.Timers
         /// </summary>
         public bool Start(TimerTicket ticket, bool init = true, bool isLazy = false)
         {
-            if (!GetTimerSafety(ticket, out var t)) return false;
+            if (!TryGetTimer(ticket, out var t)) return false;
             if (isLazy)
             {
                 var command = LazyCommand.Start | (init ? LazyCommand.Init : 0);
@@ -79,9 +77,9 @@ namespace HighElixir.Timers
         /// 再スタート。イベントや非同期から呼び出す場合は遅延実行を推奨。<br/>
         /// 遅延実行の場合、コマンドが最大数未満の時にtrue
         /// </summary>
-        public bool Restart(TimerTicket ticket, bool isLazy = true)
+        public bool Restart(TimerTicket ticket, bool isLazy = false)
         {
-            if (!GetTimerSafety(ticket, out var t)) return false;
+            if (!TryGetTimer(ticket, out var t)) return false;
             if (isLazy)
             {
                 return _commandQueue.Enqueue(ticket, LazyCommand.Restart);
@@ -89,7 +87,6 @@ namespace HighElixir.Timers
             else
             {
                 t.Restart();
-                BumpGenerationAndCancelWaiters(ticket);
             }
             return true;
         }
@@ -111,7 +108,7 @@ namespace HighElixir.Timers
         private bool Stop_Internal(TimerTicket ticket, out float remaining, bool init = false, bool isLazy = false)
         {
             remaining = 0;
-            if (!GetTimerSafety(ticket, out var t)) return false;
+            if (!TryGetTimer(ticket, out var t)) return false;
             if (isLazy)
             {
                 return _commandQueue.Enqueue(ticket, LazyCommand.Stop | (init ? LazyCommand.Init : LazyCommand.None));
@@ -131,14 +128,13 @@ namespace HighElixir.Timers
         /// </summary>
         public bool Reset(TimerTicket ticket, bool isLazy = false)
         {
-            if (!GetTimerSafety(ticket, out var t)) return false;
+            if (!TryGetTimer(ticket, out var t)) return false;
             if (isLazy)
             {
                 _commandQueue.Enqueue(ticket, LazyCommand.Reset);
                 return true;
             }
             t.Reset();
-            BumpGenerationAndCancelWaiters(ticket);
             return true;
         }
 
@@ -148,76 +144,20 @@ namespace HighElixir.Timers
         /// </summary>
         public bool Initialize(TimerTicket ticket, bool isLazy = false)
         {
-            if (!GetTimerSafety(ticket, out var t)) return false;
+            if (!TryGetTimer(ticket, out var t)) return false;
             if (isLazy)
             {
                 _commandQueue.Enqueue(ticket, LazyCommand.Init);
                 return true;
             }
             t.Initialize();
-            BumpGenerationAndCancelWaiters(ticket);
             return true;
         }
         #endregion
 
         #region 登録処理
-        /// <summary>
-        /// カウントダウンタイマーの登録
-        /// </summary>
-        public TimerTicket CountDownRegister(float duration, string name = "", Action onFinished = null, bool isTick = false, bool initZero = false, bool andStart = false)
-        {
-            lock (_lock)
-            {
-                if (duration < 0f)
-                {
-                    OnError(new ArgumentException("CountDownRegister: duration は 0 以上である必要があります。"));
-                    return default;
-                }
-                var res = Register_Internal(CountType.CountDown, name, duration, isTick, onFinished, andStart);
-                GetTimerSafety(res, out var t);
-                if (initZero)
-                    t.Current = 0f;
-                return res;
-            }
-        }
-        /// <summary>
-        /// カウントアップタイマーの登録
-        /// </summary>
-        public TimerTicket CountUpRegister(string name = "", Action onReseted = null, bool isTick = false, bool andStart = false)
-        {
-            lock (_lock)
-            {
-                return Register_Internal(CountType.CountUp, name, 1, isTick, onReseted, andStart);
-            }
-        }
 
-        /// <summary>
-        /// 決まった時間ごとにコールバックを呼ぶパルス式タイマーの登録。
-        /// </summary>
-        public TimerTicket PulseRegister(float pulseInterval, string name = "", Action onPulse = null, bool isTick = false, bool andStart = false)
-        {
-            lock (_lock)
-            {
-                if (pulseInterval < 0f)
-                {
-                    OnError(new ArgumentException("PulseRegister: pulseInterval は 0 以上である必要があります。"));
-                    return default;
-                }
-                return Register_Internal(CountType.Pulse, name, pulseInterval, isTick, onPulse, andStart);
-            }
-        }
-
-        public TimerTicket Restore(TimerSnapshot snapshot, bool andStart = false)
-        {
-            lock (_lock)
-            {
-                var ticket = Register_Internal(snapshot.CountType, snapshot.Name, snapshot.Initialize, snapshot.CountType.Has(CountType.Tick), null, andStart);
-                _timers[ticket].Current = snapshot.Current;
-                return ticket;
-            }
-        }
-
-        private TimerTicket Register_Internal(CountType type, string name, float initTime, bool isTick, Action action = null, bool andStart = false)
+        internal TimerTicket Register_Internal(CountType type, string name, float initTime, bool isTick, Action action = null, bool andStart = false)
         {
             lock (_lock)
             {
@@ -241,16 +181,6 @@ namespace HighElixir.Timers
                 {
                     timer.Dispose();
                     _timers.Remove(ticket);
-                    if (_awaits.TryGetValue(ticket, out var st))
-                    {
-                        var waiters = st.FinishWaiters.ToArray();
-                        st.FinishWaiters.Clear();
-                        _awaits.Remove(ticket);
-                        // ロック外でキャンセル通知
-                        Task.Run(() => {
-                            foreach (var tcs in waiters) tcs.TrySetCanceled();
-                        });
-                    }
                     return true;
                 }
                 return false;
@@ -262,7 +192,7 @@ namespace HighElixir.Timers
         #region 情報取得
         public IObservable<TimeData> GetReactiveProperty(TimerTicket ticket)
         {
-            if (GetTimerSafety(ticket, out var t))
+            if (TryGetTimer(ticket, out var t))
             {
                 return t.TimeReactive;
             }
@@ -284,20 +214,20 @@ namespace HighElixir.Timers
         /// 終了済みか（登録が無ければ false）。
         /// </summary>
         public bool IsFinished(TimerTicket ticket) =>
-                 GetTimerSafety(ticket, out var t) && t.IsFinished;
+                 TryGetTimer(ticket, out var t) && t.IsFinished;
 
         /// <summary>
-        /// 終了済みか（登録が無ければ false）。
+        /// 動作中か（登録が無ければ false）。
         /// </summary>
         public bool IsRunning(TimerTicket ticket) =>
-            GetTimerSafety(ticket, out var t) && t.IsRunning;
+            TryGetTimer(ticket, out var t) && t.IsRunning;
 
         /// <summary>
         /// 現在の時間を取得。
         /// </summary>
         public bool TryGetCurrentTime(TimerTicket ticket, out float current)
         {
-            if (GetTimerSafety(ticket, out var t))
+            if (TryGetTimer(ticket, out var t))
             {
                 current = t.Current;
                 return true;
@@ -309,9 +239,9 @@ namespace HighElixir.Timers
         /// <summary>
         /// 経過正規化 [0..1] を取得（未登録及びカウントアップなど正規化不可能なタイマーは 1 として返す）。
         /// </summary>
-        public bool GetNormalizedElapsed(TimerTicket ticket, out float elapsed)
+        public bool TryGetNormalizedElapsed(TimerTicket ticket, out float elapsed)
         {
-            bool res = GetTimerSafety(ticket, out var t);
+            bool res = TryGetTimer(ticket, out var t);
             elapsed = res ? t.NormalizedElapsed : 1f;
             return res;
         }
@@ -335,45 +265,18 @@ namespace HighElixir.Timers
                 yield return new TimerSnapshot(ParentName, key, t, op);
             }
         }
+        internal bool TryGetTimer(TimerTicket ticket, out ITimer timer)
+        {
+            bool found = false;
+            lock (_lock)
+            {
+                found = _timers.TryGetValue(ticket, out timer);
+            }
+            return found;
+        }
 
         #endregion
 
-        #region Timerごとの独自操作
-
-        #region UpAndDown操作
-        public void ReverseDirection(TimerTicket ticket)
-        {
-            if (GetTimerSafety(ticket, out var t) && t is IUpAndDown ud)
-            {
-                ud.ReverseDirection();
-            }
-        }
-        public void SetDirection(TimerTicket ticket, bool isUp)
-        {
-            if (GetTimerSafety(ticket, out var t) && t is IUpAndDown ud)
-            {
-                ud.SetDirection(isUp);
-            }
-        }
-        public void ReverseAndStart(TimerTicket ticket)
-        {
-            if (GetTimerSafety(ticket, out var t) && t is IUpAndDown ud)
-            {
-                ud.ReverseDirection();
-                t.Start();
-            }
-        }
-        public void SetDirectionAndStart(TimerTicket ticket, bool isUp)
-        {
-            if (GetTimerSafety(ticket, out var t) && t is IUpAndDown ud)
-            {
-                ud.SetDirection(isUp);
-                t.Start();
-            }
-        }
-        #endregion
-
-        #endregion
         /// <summary>
         /// 更新処理。
         /// </summary>
@@ -405,10 +308,18 @@ namespace HighElixir.Timers
 
 
         #region タイマーへの操作
+        public ITimerEvt GetTimerEvt(TimerTicket ticket)
+        {
+            if (TryGetTimer(ticket, out var t))
+            {
+                return t;
+            }
+            return null;
+        }
         /// <summary>
         /// 完了時の Action を追加。
         /// </summary>
-        public IDisposable AddAction(TimerTicket ticket, Action action)
+        public IDisposable AddCompleteAction(TimerTicket ticket, Action action)
         {
             lock (_lock)
             {
@@ -417,7 +328,7 @@ namespace HighElixir.Timers
                     t.OnFinished += action;
                     var dis = Disposable.Create(() =>
                     {
-                        RemoveAction(ticket, action);
+                        RemoveCompleteAction(ticket, action);
                     });
                     return dis;
                 }
@@ -428,7 +339,7 @@ namespace HighElixir.Timers
         /// <summary>
         /// 完了時の Action を削除。
         /// </summary>
-        public void RemoveAction(TimerTicket ticket, Action action)
+        public void RemoveCompleteAction(TimerTicket ticket, Action action)
         {
             lock (_lock)
             {
@@ -491,7 +402,6 @@ namespace HighElixir.Timers
                 _commandQueue.Dispose();
                 _readOnlytimers.Remove(_readonlyTimer);
                 _onError = null;
-                _awaits.Clear();
             }
         }
 
@@ -504,110 +414,5 @@ namespace HighElixir.Timers
         }
         #endregion
 
-        #region 非同期処理
-
-        // チケットごとの待機状態
-        private sealed class AwaitState
-        {
-            public int Version; // Restart/Resetで++する
-            public List<TaskCompletionSource<bool>> FinishWaiters = new();
-        }
-        private readonly Dictionary<TimerTicket, AwaitState> _awaits = new();
-
-        public Task WaitUntilFinishedAsync(TimerTicket ticket, CancellationToken ct = default)
-        {
-            lock (_lock)
-            {
-                if (!_timers.TryGetValue(ticket, out var t))
-                    return Task.FromException(new InvalidOperationException("Timer not found."));
-
-                if (t.IsFinished)
-                    return Task.CompletedTask;
-
-                if (!_awaits.TryGetValue(ticket, out var st))
-                {
-                    st = new AwaitState();
-                    _awaits[ticket] = st;
-                }
-
-                var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-
-                // キャンセル対応
-                if (ct.CanBeCanceled)
-                {
-                    var reg = ct.Register(() =>
-                    {
-                        lock (_lock)
-                        {
-                            tcs.TrySetCanceled(ct);
-                            st.FinishWaiters.Remove(tcs);
-                        }
-                    });
-                    // Task完了時に登録解除
-                    tcs.Task.ContinueWith(_ => reg.Dispose(), TaskScheduler.Default);
-                }
-
-                st.FinishWaiters.Add(tcs);
-                return tcs.Task;
-            }
-        }
-
-        // --- 完了トリガ ---
-        internal void NotifyFinished(TimerTicket ticket)
-        {
-            List<TaskCompletionSource<bool>> waiters = null;
-            lock (_lock)
-            {
-                if (_awaits.TryGetValue(ticket, out var st) && st.FinishWaiters.Count > 0)
-                {
-                    waiters = new List<TaskCompletionSource<bool>>(st.FinishWaiters);
-                    st.FinishWaiters.Clear();
-                }
-            }
-            if (waiters != null)
-            {
-                // ロック外で完了を返す
-                foreach (var tcs in waiters) tcs.TrySetResult(true);
-                _awaits.Remove(ticket);
-            }
-        }
-
-        // Restart/Reset時は世代更新＆未完了待機者をキャンセル/完了扱いに
-        private void BumpGenerationAndCancelWaiters(TimerTicket ticket)
-        {
-            List<TaskCompletionSource<bool>> waiters = null;
-            lock (_lock)
-            {
-                if (_awaits.TryGetValue(ticket, out var st))
-                {
-                    waiters = new List<TaskCompletionSource<bool>>(st.FinishWaiters);
-                    st.FinishWaiters.Clear();
-                    st.Version++; // 将来、条件待機にも使うなら活きる
-                }
-            }
-            if (waiters != null)
-            {
-                foreach (var tcs in waiters) tcs.TrySetCanceled();
-            }
-        }
-
-        // 既存の操作にフック（例：Reset/Restart/Stop完了箇所）
-
-        // ITimer 内の完了イベントから呼ぶ（CountDown終わり、CountUpがReset等）
-        internal void OnTimerFinished(TimerTicket ticket)
-        {
-            NotifyFinished(ticket);
-        }
-        #endregion
-
-        private bool GetTimerSafety(TimerTicket ticket, out ITimer timer)
-        {
-            bool found = false;
-            lock (_lock)
-            {
-                found = _timers.TryGetValue(ticket, out timer);
-            }
-            return found;
-        }
     }
 }

@@ -9,6 +9,7 @@ namespace HighElixir.Pools
         private T _original;
         private Transform _container;
 
+        public Pool<T> Pool => _pool;
         public ObjectPool(T original, int capacity, Transform container, bool lazyInit = false)
         {
             if (original == null) throw new ArgumentNullException(nameof(original));

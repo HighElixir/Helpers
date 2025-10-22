@@ -31,9 +31,13 @@ namespace HighElixir.Timers.Internal
         public IObservable<TimeData> TimeReactive => _reactive;
 
         public event Action OnFinished; // null 許容
+        public event Action OnStarted;
+        public event Action OnReset;
+        public event Action OnStopped;
+        public event Action OnInitialized;
+        public event Action OnRemoved;
 
         private Timer _timer;
-        private TimerTicket _timerTicket;
         public InternalTimerBase(TimerConfig config)
         {
             _timer = config.Timer;
@@ -44,16 +48,18 @@ namespace HighElixir.Timers.Internal
         // OnFinishedなどのイベントが呼ばれない
         public virtual void Initialize()
         {
-            Stop();
+            Stop(false);
             Current = InitialTime;
             _reactive.Notify(InitialTime, false);
+            NotifyInitialized();
         }
 
         // OnFinishedが呼ばれる可能性がある
         public virtual void Reset()
         {
-            Stop();
+            Stop(false);
             Current = InitialTime;
+            NotifyReset();
         }
 
         public virtual void Start()
@@ -61,13 +67,16 @@ namespace HighElixir.Timers.Internal
             if (IsFinished)
                 Reset();
             IsRunning = true;
+            NotifyStarted();
         }
 
-        public virtual float Stop()
+        public virtual float Stop(bool evt)
         {
             IsRunning = false;
+            if (evt) NotifyStopped();
             return Current;
         }
+        public float Stop() => Stop(true);
         public void Restart()
         {
             Reset();
@@ -76,36 +85,55 @@ namespace HighElixir.Timers.Internal
 
         public abstract void Update(float dt);
 
-        protected void InvokeEventSafely()
+        #region 通知
+        protected void NotifyComplete()
         {
             lock (_lock)
-            {
-                try
-                {
-                    OnFinished?.Invoke();
-                    _timer.OnTimerFinished(_timerTicket);
-                }
-                catch (Exception ex)
-                {
-                    OnError(ex);
-                }
-            }
+                try { OnFinished?.Invoke(); }
+                catch (Exception ex) { OnError(ex); }
         }
-
+        protected void NotifyStarted()
+        {
+            lock (_lock)
+                try { OnStarted?.Invoke(); }
+                catch (Exception ex) { OnError(ex); }
+        }
+        protected void NotifyReset()
+        {
+            lock (_lock)
+                try { OnReset?.Invoke(); }
+                catch (Exception ex) { OnError(ex); }
+        }
+        protected void NotifyStopped()
+        {
+            lock (_lock)
+                try { OnStopped?.Invoke(); }
+                catch (Exception ex) { OnError(ex); }
+        }
+        protected void NotifyInitialized()
+        {
+            lock (_lock)
+                try { OnInitialized?.Invoke(); }
+                catch (Exception ex) { OnError(ex); }
+        }
+        #endregion
         public void Dispose()
         {
             _reactive.Dispose();
+
+            // タイマーから削除されたときのイベントを発火
             OnFinished = null;
+            OnStarted = null;
+            OnReset = null;
+            OnStopped = null;
+            OnInitialized = null;
+            OnRemoved?.Invoke();
+            OnRemoved = null;
         }
 
         public void OnError(System.Exception exception)
         {
             _timer?.OnError(exception);
-        }
-
-        public void SetTicket(TimerTicket ticket)
-        {
-            _timerTicket = ticket;
         }
     }
 }

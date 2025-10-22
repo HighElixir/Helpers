@@ -18,7 +18,7 @@ namespace HighElixir.Timers.Internal
 
         public override void Reset()
         {
-            InvokeEventSafely();
+            NotifyComplete();
             base.Reset();
         }
 

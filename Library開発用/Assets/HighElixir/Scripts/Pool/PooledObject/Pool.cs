@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using UnityEngine;
 
 namespace HighElixir.Pools
 {
@@ -10,7 +9,7 @@ namespace HighElixir.Pools
         private readonly Func<T> _createMethod;
         private readonly Action<T> _destroyMethod;
         private readonly ConcurrentQueue<T> _available = new();
-        private readonly ConcurrentDictionary<T, bool> _inUse = new();
+        private readonly ConcurrentDictionary<T, byte> _inUse = new();
         private int _maxPoolSize;
         public bool Disposed { get; private set; } = false;
         public bool Initialized { get; private set; } = false;
@@ -47,7 +46,7 @@ namespace HighElixir.Pools
             if (Initialized) return;
             Initialized = true;
 
-            CreateToMaxPoolSize();
+            FillPool();
         }
 
         #region Get / Release
@@ -60,7 +59,7 @@ namespace HighElixir.Pools
 
         }
 
-        public IPooledObject<T> GetAsPooled()
+        public IPooledObject<T> GetAsDisposable()
         {
             if (Disposed) throw new ObjectDisposedException(nameof(Pool<T>));
             var obj = Get_Internal();
@@ -97,7 +96,7 @@ namespace HighElixir.Pools
             if (!_available.TryDequeue(out T obj))
                 obj = CreateInstance();
 
-            if (!_inUse.TryAdd(obj, true))
+            if (!_inUse.TryAdd(obj, 0))
                 LogWarning($"{obj} はすでに使用中です");
             return obj;
         }
@@ -136,9 +135,9 @@ namespace HighElixir.Pools
             foreach (var obj in _inUse.Keys)
                 DestroyObject(obj);
             _inUse.Clear();
-            CreateToMaxPoolSize();
+            FillPool();
         }
-        private void CreateToMaxPoolSize()
+        private void FillPool()
         {
             while (TotalCount < _maxPoolSize)
                 CreateInstance();
@@ -189,7 +188,7 @@ namespace HighElixir.Pools
         private void LogWarning(string message)
         {
 #if UNITY_EDITOR
-            Debug.LogWarning(message);
+            UnityEngine.Debug.LogWarning(message);
 #elif DEBUG
     Console.WriteLine("[Pool Warning] " + message);
 #endif

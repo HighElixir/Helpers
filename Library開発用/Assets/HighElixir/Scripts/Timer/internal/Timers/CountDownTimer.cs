@@ -31,7 +31,7 @@ namespace HighElixir.Timers.Internal
             // ちょうど/下回った → 0 に丸め、完了を 1 回だけ通知
             Current = 0f;
             Stop();
-            InvokeEventSafely();
+            NotifyComplete();
         }
     }
     internal sealed class TickCountDownTimer : CountDownTimer

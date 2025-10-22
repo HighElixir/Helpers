@@ -69,7 +69,7 @@ namespace HighElixir.Timers.Internal
             // 通常の等間隔パルス動作
             if (Current >= InitialTime * (_pulseCount + 1))
             {
-                InvokeEventSafely();
+                NotifyComplete();
                 _pulseCount++;
             }
         }
