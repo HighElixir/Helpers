@@ -3,7 +3,6 @@ using HighElixir.Tweenworks.Internal;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Windows;
 
 namespace HighElixir.Tweenworks
 {
@@ -88,7 +87,7 @@ namespace HighElixir.Tweenworks
         }
         private void OnDestroy()
         {
-            foreach(var profiler in _profilers)
+            foreach (var profiler in _profilers)
             {
                 profiler.Dispose();
             }

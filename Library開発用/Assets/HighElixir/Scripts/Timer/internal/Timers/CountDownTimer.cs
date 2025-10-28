@@ -39,7 +39,7 @@ namespace HighElixir.Timers.Internal
         public override CountType CountType => base.CountType | CountType.Tick;
 
         // 小数点以下切り捨てのため int 型で扱う
-        public TickCountDownTimer(TimerConfig config) : base(config) 
+        public TickCountDownTimer(TimerConfig config) : base(config)
         {
             InitialTime = (int)InitialTime;
         }

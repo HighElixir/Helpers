@@ -1,8 +1,8 @@
-﻿using UnityEditor;
-using UnityEngine;
+﻿using HighElixir.Timers;
 using System;
 using System.Collections.Generic;
-using HighElixir.Timers;
+using UnityEditor;
+using UnityEngine;
 
 namespace HighElixir.Editors
 {

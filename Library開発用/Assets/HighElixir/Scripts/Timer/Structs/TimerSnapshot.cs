@@ -16,7 +16,7 @@ namespace HighElixir.Timers
         public readonly CountType CountType;
         public readonly float Optional; // PulseTypeのパルス数などを保存
 
-        public TimerSnapshot(string parentName,TimerTicket ticket, ITimer timer, float optional = -1)
+        public TimerSnapshot(string parentName, TimerTicket ticket, ITimer timer, float optional = -1)
         {
             ParentName = parentName;
             Key = ticket.Key;

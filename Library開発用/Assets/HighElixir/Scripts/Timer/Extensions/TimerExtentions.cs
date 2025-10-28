@@ -41,6 +41,7 @@ namespace HighElixir.Timers.Extensions
             {
                 _disposable?.Dispose();
                 _onLaze = null;
+                Remove(this);
             }
         }
         // TODO : 遅延実行、タグ付き管理(別クラス)の実装
@@ -50,44 +51,51 @@ namespace HighElixir.Timers.Extensions
         private static List<Obs> _lazyCommand;
         private static object _lock = new object();
 
-        public static IDisposable DOStart(this Timer t, TimerTicket ticket, float lazyTime)
+        public static IDisposable DOStart(this Timer t, float lazyTime, TimerTicket ticket)
         {
             Action ac = () => t.Start(ticket, false, true);
-            return RegisterTicket(ticket, lazyTime, ac);
-        }
-        public static IDisposable DOStop(this Timer t, TimerTicket ticket, float lazyTime, bool init = true)
-        {
-            Action ac = () => t.Stop(ticket, init, true);
-            return RegisterTicket(ticket, lazyTime, ac);
-        }
-        public static IDisposable DORestart(this Timer t, TimerTicket ticket, float lazyTime)
-        {
-            Action ac = () => t.Restart(ticket, true);
-            return RegisterTicket(ticket, lazyTime, ac);
-        }
-        public static IDisposable DOReset(this Timer t, TimerTicket ticket, float lazyTime)
-        {
-            Action ac = () => t.Reset(ticket, true);
-            return RegisterTicket(ticket, lazyTime, ac);
+            return RegisterTicket(lazyTime, ac);
         }
 
-        private static IDisposable RegisterTicket(TimerTicket ticket, float lazyTime, Action action)
+        public static IDisposable DOStop(this Timer t, float lazyTime, TimerTicket ticket, bool init = true)
         {
+            Action ac = () => t.Stop(ticket, init, true);
+            return RegisterTicket(lazyTime, ac);
+        }
+
+        public static IDisposable DORestart(this Timer t, float lazyTime, TimerTicket ticket)
+        {
+            Action ac = () => t.Restart(ticket, true);
+            return RegisterTicket(lazyTime, ac);
+        }
+
+        public static IDisposable DOReset(this Timer t, float lazyTime, TimerTicket ticket)
+        {
+            Action ac = () => t.Reset(ticket, true);
+            return RegisterTicket(lazyTime, ac);
+        }
+
+        public static IDisposable DoAction(this Action onAction, float lazyTime, TimerTicket ticket = default)
+            => RegisterTicket(lazyTime, onAction);
+
+        private static IDisposable RegisterTicket(float lazyTime, Action action)
+        {
+            var timer = GlobalTimer.Update;
             lock (_lock)
             {
                 if (!_lazyInitialized)
                 {
                     _lazyCommand = new();
-                    _lazyTicket = GlobalTimer.Update.CountUpRegister("Lazy", andStart: true);
+                    _lazyTicket = timer.CountUpRegister("Lazy", andStart: true);
                     _lazyInitialized = true;
                 }
-                if (!GlobalTimer.Update.IsRunning(_lazyTicket))
-                    GlobalTimer.Update.Start(_lazyTicket);
+                if (!timer.IsRunning(_lazyTicket))
+                    timer.Start(_lazyTicket);
             }
-            if (!GlobalTimer.Update.TryGetCurrentTime(_lazyTicket, out var t))
+            if (!timer.TryGetCurrentTime(_lazyTicket, out var t))
                 t = 0f;
             var obs = new Obs(t + lazyTime, action);
-            var dis = obs.AddDisposeAsAction(GlobalTimer.Update.GetReactiveProperty(_lazyTicket).Subscribe(obs));
+            var dis = obs.AddDisposeAsAction(timer.GetReactiveProperty(_lazyTicket).Subscribe(obs));
             _lazyCommand.Add(obs);
             return dis;
         }

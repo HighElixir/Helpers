@@ -52,7 +52,7 @@ namespace HighElixir.Timers
         /// <summary>
         /// カウントダウンタイマーの登録
         /// </summary>
-        public static TimerTicket UpDownRegister(this Timer t, float duration, string name = "", Action onFinished = null, bool isTick = false, bool initZero = false, bool andStart = false)
+        public static TimerTicket UpDownRegister(this Timer t, float duration, string name = "", Action onFinished = null, bool reversing = false, bool isTick = false, bool initZero = false, bool andStart = false)
         {
             lock (t._lock)
             {
@@ -62,11 +62,15 @@ namespace HighElixir.Timers
                     return default;
                 }
                 var res = t.Register_Internal(CountType.UpAndDown, name, duration, isTick, onFinished, andStart);
-                
+
+                if (!t.TryGetTimer(res, out var timer)) return res;
                 if (initZero)
                 {
-                    t.TryGetTimer(res, out var timer);
                     timer.Current = 0f;
+                }
+                if (reversing && timer is IUpAndDown up)
+                {
+                    up.SetDirection(reversing);
                 }
                 return res;
             }

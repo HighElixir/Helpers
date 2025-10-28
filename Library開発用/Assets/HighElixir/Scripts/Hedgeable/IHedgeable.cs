@@ -5,7 +5,7 @@ namespace HighElixir.Hedgeable
     /// <summary>
     /// ヘッジ可能な要素を表すインターフェース。
     /// </summary>
-    public interface IHedgeable<T, TSelf>
+    public interface IHedgeable<T, TSelf> : IComparable<TSelf>, IEquatable<TSelf>
         where TSelf : IHedgeable<T, TSelf>
         where T : struct, IComparable<T>, IEquatable<T>
     {
@@ -33,6 +33,6 @@ namespace HighElixir.Hedgeable
         /// ヘッジ処理が行われたときに呼び出されるイベントを購読する。
         /// 1つめは変更前、2つめは変更後
         /// </summary>
-        IDisposable Subscribe(Action<T, T> onHedge);
+        IDisposable Subscribe(Action<ChangeResult<T>> onValueChanged);
     }
 }

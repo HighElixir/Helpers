@@ -1,13 +1,13 @@
-﻿using HighElixir.Timers;
-using HighElixir.Timers.Extensions;
+﻿using Cysharp.Threading.Tasks;
 using HighElixir.Async.Timers;
+using HighElixir.Timers;
+using HighElixir.Timers.Extensions;
 using System.Collections.Generic;
+using System.Threading;
 using TMPro;
+using UniRx;
 using UnityEngine;
 using UnityEngine.UI;
-using UniRx;
-using Cysharp.Threading.Tasks;
-using System.Threading;
 
 namespace HighElixir.Samples
 {
@@ -123,7 +123,8 @@ namespace HighElixir.Samples
 
         private void Update()
         {
-            if (GlobalTimer.Update.TryGetNormalizedElapsed(_ticketHolder[nameof(_upAndDown)], out var elapsed)){
+            if (GlobalTimer.Update.TryGetNormalizedElapsed(_ticketHolder[nameof(_upAndDown)], out var elapsed))
+            {
                 _bar.value = elapsed;
             }
         }

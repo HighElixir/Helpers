@@ -1,8 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 
-namespace HighElixir
+namespace HighElixir.Collections
 {
     /// <summary>
     /// リスト操作、要素の取得に関するヘルパークラス。

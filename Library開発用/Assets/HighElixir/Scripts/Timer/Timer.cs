@@ -14,7 +14,7 @@ namespace HighElixir.Timers
     /// </summary>
     public sealed class Timer : IReadOnlyTimer, IDisposable
     {
-        private readonly string _parentName;
+        private string _parentName;
         private readonly Dictionary<TimerTicket, ITimer> _timers = new();
 
         // 管理
@@ -34,11 +34,19 @@ namespace HighElixir.Timers
         {
             get
             {
-                if (string.IsNullOrEmpty(_parentName))
-                {
-                    return UnknownType.Name;
-                }
                 return _parentName;
+            }
+            set
+            {
+
+                if (string.IsNullOrEmpty(value))
+                {
+                    _parentName = UnknownType.Name;
+                }
+                else
+                {
+                    _parentName = value;
+                }
             }
         }
         public static IReadOnlyList<IReadOnlyTimer> AllTimers => _readOnlytimers.AsReadOnly();

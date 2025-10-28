@@ -10,6 +10,7 @@ namespace HighElixir.Timers
         internal class Wrapper
         {
             public readonly Lazy<Timer> Timer;
+            internal TimerTicket _stream;
             public bool IsCreated => Timer.IsValueCreated;
             internal Timer Instance => Timer.Value;
             public Wrapper(string name)

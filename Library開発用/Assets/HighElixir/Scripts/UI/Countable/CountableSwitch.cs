@@ -1,11 +1,11 @@
-﻿using System;
+﻿using HighElixir.Hedgeable;
+using System;
 using TMPro;
 using UniRx;
 using UniRx.Triggers;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UI;
-using HighElixir.Hedgeable;
 
 namespace HighElixir.UI.Countable
 {
@@ -22,18 +22,12 @@ namespace HighElixir.UI.Countable
         [SerializeField] private Button _plus;
         [SerializeField] private TMP_InputField _text;
 
-        [Header("Audio")]
-        [SerializeField] private ClickSoundOp _soundOption = ClickSoundOp.One;
-        [SerializeField] private AudioClip _clickSound;
-        [SerializeField] private AudioClip _disallowedSound;
-        [SerializeField] private AudioClip _minusSound;
-        [SerializeField] private AudioClip _plusSound;
-        [SerializeField] private UnityEvent<int> _onChanged = new();
-        private AudioSource _audioSource;
+        [Header("Action")]
+        [SerializeField] private UnityEvent<ChangeResult<int>> _onValueChanged = new();
 
         [Header("Data")]
         [SerializeField] private int _defaultAmount = 0;
-        [SerializeField] private int _oneClickChange = 1;
+        [SerializeField] private int _step = 1;
         private Hedgeable<int> _value;
         private int min = int.MinValue;
         private int max = int.MaxValue;
@@ -55,7 +49,7 @@ namespace HighElixir.UI.Countable
             }
         }
         public Func<int, int, bool> AllowChange { get; set; }
-        public UnityEvent<int> OnChanged => _onChanged;
+        public UnityEvent<ChangeResult<int>> OnValueChanged => _onValueChanged;
         public int Value
         {
             get => _value;
@@ -66,7 +60,6 @@ namespace HighElixir.UI.Countable
                 {
                     _value.Value = value;
                     _text.text = _value.ToString();
-                    _onChanged?.Invoke(this);
                 }
             }
         }
@@ -78,21 +71,15 @@ namespace HighElixir.UI.Countable
             return _value != old && _value == newValue;
         }
 
-        private void Play(AudioClip clip)
-        {
-            if (clip != null && _audioSource != null)
-                _audioSource.PlayOneShot(clip);
-        }
-
         private void Awake()
         {
-            // AudioSource 準備
-            _audioSource = GetComponent<AudioSource>() ?? gameObject.AddComponent<AudioSource>();
-            _audioSource.playOnAwake = false;
-
             // 初期値セット
             _value = new Hedgeable<int>(_defaultAmount, min, max);
-            var d = _value.Subscribe((x, _) => _text.text = x.ToString()).AddTo(this);
+            var d = _value.Subscribe(x =>
+            {
+                _text.text = x.NewValue.ToString();
+                _onValueChanged?.Invoke(x);
+            }).AddTo(this);
             _text.text = _value.ToString();
             this.OnDestroyAsObservable().Subscribe(_ =>
             {
@@ -101,35 +88,13 @@ namespace HighElixir.UI.Countable
             // Minus ボタン
             _minus.onClick.AddListener(() =>
             {
-                bool ok = TrySetValue(_value - _oneClickChange);
-                if (!ok)
-                {
-                    Play(_disallowedSound);
-                }
-                else
-                {
-                    if (_soundOption == ClickSoundOp.Two)
-                        Play(_minusSound);
-                    else
-                        Play(_clickSound);
-                }
+                TrySetValue(_value - _step);
             });
 
             // Plus ボタン
             _plus.onClick.AddListener(() =>
             {
-                bool ok = TrySetValue(_value + _oneClickChange);
-                if (!ok)
-                {
-                    Play(_disallowedSound);
-                }
-                else
-                {
-                    if (_soundOption == ClickSoundOp.Two)
-                        Play(_plusSound);
-                    else
-                        Play(_clickSound);
-                }
+                TrySetValue(_value + _step);
             });
 
             // テキスト入力確定時

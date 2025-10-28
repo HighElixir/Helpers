@@ -50,7 +50,7 @@ namespace HighElixir.Timers.Internal
         {
             if (_factory.TryGetValue(type, out var func))
             {
-                var timer = func.Invoke(new TimerConfig( _timer, initTime, action));
+                var timer = func.Invoke(new TimerConfig(_timer, initTime, action));
                 timer.Initialize();
                 return timer;
             }

@@ -20,7 +20,7 @@ namespace HighElixir.SceneManagement
         internal static async void FinalizeSceneChange()
         {
             await Resources.UnloadUnusedAssets();
-            
+
         }
 
         internal static async Task GetProgress(AsyncOperation operation, IProgress<float> progress)

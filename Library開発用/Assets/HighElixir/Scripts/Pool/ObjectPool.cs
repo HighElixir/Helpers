@@ -1,5 +1,6 @@
 ﻿using System;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace HighElixir.Pools
 {
@@ -18,17 +19,14 @@ namespace HighElixir.Pools
             _pool = new Pool<T>(
                 () =>
                 {
-                    if (_original is GameObject go)
+                    if (_container == null)
                     {
-                        var instance = UnityEngine.Object.Instantiate(go, _container);
-                        return instance as T;
+                        var go = new GameObject($"[{_original.name}]Container");
+                        SceneManager.MoveGameObjectToScene(go, SceneManager.GetActiveScene());
+                        _container = go.transform;
                     }
-                    else if (_original is Component comp)
-                    {
-                        var instance = UnityEngine.Object.Instantiate(comp, _container);
-                        return instance as T;
-                    }
-                    return null;
+                    var instance = UnityEngine.Object.Instantiate(_original, _container);
+                    return instance;
                 },
                 (obj) =>
                 {

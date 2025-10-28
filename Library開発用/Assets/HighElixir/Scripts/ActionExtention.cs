@@ -1,4 +1,5 @@
 ﻿using HighElixir.Implements;
+using HighElixir.Implements.Observables;
 using System;
 using System.Reflection;
 using System.Runtime.ExceptionServices;
@@ -51,7 +52,7 @@ namespace HighElixir
             // フィールド or イベント情報を取得
             var type = instance.GetType();
             EventInfo eventInfo = null;
-            var obs = new ActionObservable<T>(x => onNext(x), onComplete, onError);
+            var obs = new ActionObserver<T>(x => onNext(x), onComplete, onError);
             eventInfo = type.GetEvent(methodName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
 
             if (eventInfo == null)

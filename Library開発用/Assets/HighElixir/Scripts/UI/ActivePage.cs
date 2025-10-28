@@ -33,9 +33,9 @@ namespace HighElixir.UI
         private void Awake()
         {
             _countable = GetComponent<CountableSwitch>();
-            _countable.OnChanged.AddListener(s =>
+            _countable.OnValueChanged.AddListener(s =>
             {
-                var page = s;
+                var page = s.NewValue;
                 for (int i = 0; i < _pages.Count; i++)
                 {
                     if (i + 1 == page)

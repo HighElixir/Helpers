@@ -1,6 +1,6 @@
-﻿using System;
+﻿using HighElixir.Implements;
+using System;
 using System.Collections.Generic;
-using HighElixir.Implements;
 
 namespace HighElixir.Timers.Internal
 {

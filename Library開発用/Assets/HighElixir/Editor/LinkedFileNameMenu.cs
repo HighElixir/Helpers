@@ -1,7 +1,7 @@
-﻿using UnityEditor;
-using UnityEngine;
+﻿using System.IO;
 using System.Reflection;
-using System.IO;
+using UnityEditor;
+using UnityEngine;
 
 namespace HighElixir.Editors
 {

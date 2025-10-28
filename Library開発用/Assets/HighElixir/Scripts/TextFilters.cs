@@ -1,4 +1,5 @@
-﻿using System.Text.RegularExpressions;
+﻿using System.Collections.Generic;
+using System.Text.RegularExpressions;
 
 namespace HighElixir
 {
@@ -12,6 +13,25 @@ namespace HighElixir
             => string.IsNullOrEmpty(input)
                 ? input ?? string.Empty
                 : NumberTagPattern.Replace(input, string.Empty);
+        public static void AutoRename(ref Dictionary<string, string> names)
+        {
+            Dictionary<string, int> nameCounts = new Dictionary<string, int>();
+            foreach (var key in names.Keys)
+            {
+                string originalBaseName = names[key].RemoveNumericTags();
+                string baseName = originalBaseName.ToLower();
+                if (nameCounts.ContainsKey(baseName))
+                {
+                    nameCounts[baseName]++;
+                    names[key] = $"{originalBaseName}({nameCounts[baseName]})";
+                }
+                else
+                {
+                    nameCounts[baseName] = 0;
+                    names[key] = originalBaseName;
+                }
+            }
+        }
 
         private static readonly Regex NumberTagPattern =
             new(@"[\(（]\p{Nd}+[\)）]", RegexOptions.Compiled);

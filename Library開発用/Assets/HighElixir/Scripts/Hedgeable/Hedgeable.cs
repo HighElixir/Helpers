@@ -4,32 +4,35 @@ using System;
 namespace HighElixir.Hedgeable
 {
     /// <summary>
-    /// 特定の範囲内で値を変化させることができる int 型のラッパー。
+    /// 特定の範囲内で値を変化させることができるラッパー。
     /// </summary>
-    public struct Hedgeable<T> : IHedgeable<T, Hedgeable<T>>
+    public sealed class Hedgeable<T> : IHedgeable<T, Hedgeable<T>>
         where T : struct, IComparable<T>, IEquatable<T>
     {
         private T _value;
         private T _minValue;
         private T _maxValue;
+        private FailedChangeHandle _handle;
         // -1 ならば負方向、+1 ならば正方向、0 ならば変化なし
         private int _direction;
-        private Action<T, T> _onHedge;
+        private Action<ChangeResult<T>> _onValueChanged;
+
         public T Value
         {
             get => _value;
             set
             {
                 var oldValue = _value;
+                bool result = true;
                 if (value.CompareTo(_maxValue) > 0)
                 {
-                    _value = _maxValue;
-                    _onHedge?.Invoke(oldValue, _value);
+                    FailedHandle(value, oldValue);
+                    result = false;
                 }
                 else if (value.CompareTo(_minValue) < 0)
                 {
-                    _value = _minValue;
-                    _onHedge?.Invoke(oldValue, _value);
+                    FailedHandle(value, oldValue);
+                    result = false;
                 }
                 else
                 {
@@ -43,6 +46,8 @@ namespace HighElixir.Hedgeable
                     return;
                 }
                 Direction = diff;
+                // イベントの発火
+                _onValueChanged?.Invoke(new ChangeResult<T>(result, oldValue, _value));
             }
         }
         /// <summary>
@@ -56,13 +61,13 @@ namespace HighElixir.Hedgeable
         public T MinValue => _minValue;
         public T MaxValue => _maxValue;
 
-        public Hedgeable(T initialValue, T minValue, T maxValue, Action<T, T> onHedge = null)
+        public Hedgeable(T initialValue, T minValue, T maxValue, FailedChangeHandle handle = FailedChangeHandle.Revert, Action<ChangeResult<T>> onValueChanged = null)
         {
             _minValue = minValue;
             _maxValue = maxValue;
             _value = initialValue;
             _direction = 0;
-            _onHedge = onHedge;
+            _onValueChanged = onValueChanged;
         }
 
 
@@ -84,11 +89,11 @@ namespace HighElixir.Hedgeable
             }
             return this;
         }
-        public IDisposable Subscribe(Action<T, T> onHedge)
+        public IDisposable Subscribe(Action<ChangeResult<T>> onValueChanged)
         {
-            _onHedge = onHedge;
-            var ac = _onHedge;
-            return Disposable.Create(() => ac -= onHedge);
+            _onValueChanged = onValueChanged;
+            var ac = _onValueChanged;
+            return Disposable.Create(() => ac -= onValueChanged);
         }
 
         public bool CanSetValue(T newValue)
@@ -96,11 +101,49 @@ namespace HighElixir.Hedgeable
             return newValue.CompareTo(_minValue) >= 0 && newValue.CompareTo(_maxValue) <= 0;
         }
 
-
+        private void FailedHandle(T value, T oldValue)
+        {
+            switch (_handle)
+            {
+                case FailedChangeHandle.Revert:
+                    _value = oldValue;
+                    break;
+                case FailedChangeHandle.Clamp:
+                    if (value.CompareTo(_maxValue) > 0)
+                    {
+                        _value = _maxValue;
+                    }
+                    else if (value.CompareTo(_minValue) < 0)
+                    {
+                        _value = _minValue;
+                    }
+                    break;
+                case FailedChangeHandle.ReturnToZero:
+                    _value = default;
+                    if (_value.CompareTo(_minValue) < 0)
+                        _value = _minValue;
+                    else if (_value.CompareTo(_maxValue) > 0)
+                        _value = _maxValue;
+                    break;
+            }
+        }
+        #region
         public override string ToString()
         {
             return _value.ToString();
         }
+
+        public int CompareTo(Hedgeable<T> other)
+        {
+            return _value.CompareTo(other._value);
+        }
+
+        public bool Equals(Hedgeable<T> other)
+        {
+            return _value.Equals(other._value);
+        }
+        #endregion
+
         public static implicit operator T(Hedgeable<T> h) => h.Value;
     }
 }

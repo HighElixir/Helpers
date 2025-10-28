@@ -11,6 +11,7 @@ namespace HighElixir.Timers.Internal
         // true: 上昇中, false: 下降中
         public bool IsReversing { get; private set; } = false;
 
+        public event Action<bool> OnReversed;
         public UpAndDownTimer(TimerConfig config) : base(config)
         {
             if (config.Duration <= 0f) OnError(new ArgumentOutOfRangeException(nameof(config.Duration)));
@@ -53,12 +54,13 @@ namespace HighElixir.Timers.Internal
 
         public void ReverseDirection()
         {
-            IsReversing = !IsReversing;
+            SetDirection(!IsReversing);
         }
 
         public void SetDirection(bool isUp)
         {
             IsReversing = isUp;
+            OnReversed?.Invoke(isUp);
         }
     }
 

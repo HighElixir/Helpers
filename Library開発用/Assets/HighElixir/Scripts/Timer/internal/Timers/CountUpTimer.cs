@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace HighElixir.Timers.Internal
+﻿namespace HighElixir.Timers.Internal
 {
     internal class CountUpTimer : InternalTimerBase
     {
