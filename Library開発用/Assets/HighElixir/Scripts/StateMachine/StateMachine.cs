@@ -1,6 +1,8 @@
 ﻿using HighElixir.Implements;
 using HighElixir.Implements.Observables;
+using HighElixir.Loggings;
 using HighElixir.StateMachine.Extention;
+using HighElixir.StateMachine.Internal;
 using System;
 using System.Collections.Generic;
 using System.Runtime.ExceptionServices;
@@ -11,126 +13,143 @@ namespace HighElixir.StateMachine
     /// ステートマシンの本体クラス
     /// <br/>任意のコンテキスト・イベント・ステート型を扱う汎用ステートマシン
     /// </summary>
-    public sealed partial class StateMachine<TCont, TEvt, TState> : IDisposable
-        where TState : IEquatable<TState>
+    public sealed partial class StateMachine<TCont, TEvt, TState> : IStateMachine<TCont>, IDisposable
+
     {
-        // コンテキスト
+        #region Fields
+        private IStateMachine<TCont> _parent;
+
+        // コンテクスト
         internal TCont _cont;
+        private TState _initial;
 
-        // イベントキュー（遅延処理）
-        private EventQueue<TCont, TEvt, TState> _queue;
+        // 外部
+        private IEventQueue<TCont, TEvt, TState> _queue;
+        private TransitionExecutor<TCont, TEvt, TState> _executor;
+        private readonly Dictionary<TState, StateInfo> _states = new();
+        private ILogger _logger;
 
-        // 起動状態
-        public bool Awaked { get; internal set; }
+        // 通知
+        private readonly ReactiveProperty<TransitionResult> _onTransition = new();
+        private readonly ReactiveProperty<StateInfo> _onCompletion = new();
 
-        // ステート一覧
-        private Dictionary<TState, State> _states = new();
+        // 状態管理
+        private (TState id, StateInfo info) _current;
+        private bool _disposed;
 
-        // 任意遷移マップ
-        private Dictionary<TEvt, TState> _anyTransition = new();
+        #endregion
 
-        // 遷移イベント (from, event, to)
-        private ReactiveProperty<TransitionResult> _onTransition = new();
-        public IObservable<TransitionResult> OnTransition => _onTransition;
+        #region Delegates / Hooks
 
-        // 現在のステート情報
-        private (TState id, State state) _current;
-        public (TState id, State state) Current => _current;
+        // 外部委譲
+        public IStateMachineErrorHandler ErrorHandler { get; set; }
+        public IStateRegisterProcessor<TCont, TEvt, TState> RegisterProcessor { get; set; }
 
-        /// <summary>現在のコンテキスト（TCont）</summary>
+        #endregion
+
+        #region Properties
+
+        public IStateMachine<TCont> Parent { get => _parent; internal set => _parent = value; }
         public TCont Context => _cont;
+        public (TState id, StateInfo info) Current { get => _current; internal set => _current = value; }
+        public ILogger Logger { get => _logger; internal set => _logger = value; }
+        public bool Awaked { get; internal set; }
+        public bool IsRunning { get; internal set; }
+        public bool Disposed => _disposed;
+        public IObservable<TransitionResult> OnTransition => _onTransition;
+        public IObservable<StateInfo> OnCompletion => _onCompletion;
 
-        /// <summary>
-        /// ステートマシンの生成
-        /// </summary>
-        /// <param name="context">対象コンテキスト（MonoBehaviourなど）</param>
-        /// <param name="queueMode">イベントキュー処理モード</param>
-        public StateMachine(TCont context, QueueMode queueMode = QueueMode.UntilFailures)
+        #endregion
+
+        #region Constructor
+
+        public StateMachine(TCont context, QueueMode mode = QueueMode.UntilFailures, IEventQueue<TCont, TEvt, TState> eventQueue = null, ILogger logger = null)
         {
             _cont = context;
-            _queue = new(this, queueMode);
+            _queue = eventQueue ?? new DefaultEventQueue<TCont, TEvt, TState>(this, mode);
+            _executor = new(this);
+            _logger = logger;
         }
 
-        /// <summary>
-        /// ステートマシンを起動し、初期ステートに遷移する
-        /// </summary>
-        /// <param name="initialState">初期ステートID</param>
+        #endregion
+
+        #region Lifecycle
+
         public void Awake(TState initialState)
         {
-            // 致命的なため即スロー
-            if (initialState == null)
-                throw new ArgumentNullException("[StateMachine]初期ステートが設定されていません");
+            if (!_states.ContainsKey(initialState))
+                throw new ArgumentNullException($"[StateMachine]初期ステート {initialState} が存在しません");
+            _initial = initialState;
+            Awaked = true;
+            Reset();
+            Start();
+        }
 
-            if (!_states.TryGetValue(initialState, out var state))
-                throw new ArgumentNullException($"[StateMachine]初期ステート{initialState}が存在しません");
+        public void Pause(bool initialize = true)
+        {
+            IsRunning = false;
+            if (initialize)
+                Reset();
+        }
 
-            _current = (initialState, state);
+        public void Resume()
+            => Start();
 
+        private void Start()
+        {
+            if (!_states.ContainsKey(_initial)) return;
             try
             {
-                state.Enter(default);
-                Awaked = true;
+                _current.info.State.Enter();
+                _current.info.SubHost?.OnParentEnter();
+                IsRunning = true;
             }
             catch (Exception ex)
             {
                 OnError(ex);
             }
         }
-
-        /// <summary>
-        /// ステートマシンの更新処理
-        /// <br/>キューの処理と現在ステートのUpdateを呼び出す
-        /// </summary>
-        public void Update(float deltaTime = 0f)
+        public void Reset()
         {
-            if (_disposed) return;
-            var s = _current.state;
-
-            // コマンドデキューが許可されていればイベントを処理
-            if ((s.blockCommandDequeueFunc != null || s.blockCommandDequeueFunc()) &&
-                !s.BlockCommandDequeue())
-                _queue.Update();
-
-            s.Update(deltaTime);
+            if (_states.TryGetValue(_initial, out var state))
+                _current = (_initial, state);
         }
 
-        #region 遷移イベント処理
+        public void Update(float deltaTime = 0f)
+        {
+            if (_disposed || !Awaked) return;
+            var s = _current.info;
 
-        /// <summary>
-        /// 即時にイベントを送信して遷移を試みる
-        /// </summary>
+            if ((s.blockCommandDequeueFunc != null && s.blockCommandDequeueFunc()) &&
+                !s.State.BlockCommandDequeue())
+                _queue.Process();
+
+            s.State.Update(deltaTime);
+            s.SubHost?.Update(deltaTime); // ★ 追加：子FSM Update
+        }
+
+
+        #endregion
+
+        #region Transition
+
         public bool Send(TEvt evt)
         {
-            if (_disposed) return false;
-            var s = Current.state;
-
-            // 現在のステート → 任意遷移 の順で探索
-            if (!s._transitionMap.TryGetValue(evt, out var to) &&
-                !_anyTransition.TryGetValue(evt, out to))
-                return false;
-
-            // 遷移の許可を確認
-            if ((s.allowExitFunc != null && !s.allowExitFunc(to)) || !s.AllowExit())
-                return false;
-            if (!_states.TryGetValue(to, out var toState))
-                return false;
-            if ((toState.allowEnterFunc != null && !toState.allowEnterFunc(_current.id)) || !toState.AllowEnter())
-                return false;
+            if (_disposed || !Awaked) return false;
+            var s = Current.info;
 
             try
             {
-                // 遷移イベント通知
-                _onTransition.Value = new(_current.id, evt, to);
+                if (s.SubHost != null && s.SubHost.ForwardFirst && s.SubHost.TrySend(evt))
+                    return true;
 
-                // Exit → Enter 呼び出し順
-                s.Exit(to);
-                s.InvokeExitAction(to);
-                toState.InvokeEnterAction(_current.id);
-                toState.Enter(_current.id);
-
-                // 現在ステート更新
-                _current.state = toState;
-                _current.id = to;
+                // 親自身の遷移判定
+                if (!_executor.TryTransition(evt))
+                {
+                    if (s.SubHost != null && !s.SubHost.ForwardFirst)
+                        return s.SubHost.TrySend(evt);
+                    return false;
+                }
                 return true;
             }
             catch (Exception e)
@@ -140,51 +159,55 @@ namespace HighElixir.StateMachine
             }
         }
 
-        /// <summary>
-        /// 遅延実行としてイベントをキューに送信する
-        /// </summary>
+
         public void LazySend(TEvt evt)
         {
-            if (_disposed) return;
+            if (_disposed || !Awaked) return;
             _queue.Enqueue(evt);
         }
 
         #endregion
 
-        #region 登録
+        #region Registration
 
         /// <summary>
         /// ステートを登録する
         /// </summary>
-        public void RegisterState(TState stateID, State state, params string[] tags)
+        public StateInfo RegisterState(TState id, State<TCont> state, params string[] tags)
         {
-            if (_disposed) return;
+            if (_disposed) return null;
             if (Awaked)
                 throw new InvalidOperationException("[StateMachine]ステートマシンは起動済みです");
 
-            if (_states.ContainsKey(stateID))
-            {
-#if DEBUG || UNITY_EDITOR
-                throw new InvalidOperationException($"[StateMachine]このIDは既に登録されています:{stateID}");
-#else
-                return;
-#endif
-            }
+            if (_states.ContainsKey(id))
+                throw new InvalidOperationException($"[StateMachine]このIDは既に登録されています: {id}");
 
             state.Tags.AddRange(tags);
             state.Parent = this;
-            _states[stateID] = state;
+            _states[id] = new() { _state = state, Parent = this, ID = id };
+            if (state is INotifyStateCompletion)
+            {
+                var d = _states[id].ObserveAction().Subscribe(x => _onCompletion.Value = x);
+                _states[id]._obs.Join(d);
+            }
+            try
+            {
+                // 外部プロセッサに委譲
+                RegisterProcessor?.OnRegisterState(id, _states[id]);
+            }
+            catch (Exception ex)
+            {
+                OnError(ex);
+            }
+
+            if (_logger != null)
+                _logger.Info($"[{Context.ToString()}] ステート登録：{id.ToString()}");
+            return _states[id];
         }
 
-        /// <summary>
-        /// 通常の遷移を登録する
-        /// </summary>
         public void RegisterTransition(TState fromState, TEvt evt, TState toState)
             => RegisterTransition(fromState, evt, toState, null, null);
 
-        /// <summary>
-        /// 通常遷移＋購読イベントを登録する
-        /// </summary>
         public IDisposable RegisterTransition(
             TState fromState,
             TEvt evt,
@@ -192,93 +215,66 @@ namespace HighElixir.StateMachine
             Action<TransitionResult> onTransition,
             Func<TransitionResult, bool> predicate = null)
         {
-            if (!_disposed)
+            if (_disposed) return null;
+            if (Awaked)
+                OnError(new InvalidOperationException("[StateMachine]ステートマシンは起動済みです"));
+
+            if (!_states.TryGetValue(fromState, out var state))
             {
-                if (Awaked)
-                    throw new InvalidOperationException("[StateMachine]ステートマシンは起動済みです");
+                state = CreateInfo(fromState);
+            }
 
-                if (!_states.TryGetValue(fromState, out var state))
-                {
-#if DEBUG || UNITY_EDITOR
-                    throw new InvalidOperationException($"[StateMachine]IDが存在しません:{fromState}");
-#else
-                    return;
-#endif
-                }
+            state.RegisterTransition(evt, toState);
 
-                state._transitionMap.Add(evt, toState);
-
-                // 条件付き購読
-                if (onTransition != null)
-                {
-                    return this.OnTransWhere(fromState, evt, toState)
-                               .Where(x => predicate == null || predicate(x))
-                               .Subscribe(onTransition);
-                }
+            if (onTransition != null)
+            {
+                return this.OnTransWhere(fromState, evt, toState)
+                           .Where(x => predicate == null || predicate(x))
+                           .Subscribe(onTransition);
             }
             return null;
         }
 
-        /// <summary>
-        /// 任意遷移を登録する（どのステートからでも遷移可能）
-        /// </summary>
         public void RegisterAnyTransition(TEvt evt, TState toState)
             => RegisterAnyTransition(evt, toState, null);
 
-        /// <summary>
-        /// 任意遷移＋購読イベントを登録する
-        /// </summary>
         public IDisposable RegisterAnyTransition(
             TEvt evt,
             TState toState,
             Action<TransitionResult> onTransition,
             Func<TransitionResult, bool> predicate = null)
         {
-            if (!_disposed)
+            if (_disposed) return null;
+            if (Awaked)
+                OnError(new InvalidOperationException("[StateMachine]ステートマシンは起動済みです"));
+
+            _executor.AnyTransition.Add(evt, toState);
+
+            if (onTransition != null)
             {
-                if (Awaked)
-                    throw new InvalidOperationException("[StateMachine]ステートマシンは起動済みです");
-
-                _anyTransition.Add(evt, toState);
-
-                // 条件付き購読
-                if (onTransition != null)
-                {
-                    return this.OnTransWhere(evt, toState)
-                               .Where(x => predicate == null || predicate(x))
-                               .Subscribe(onTransition);
-                }
+                return this.OnTransWhere(evt, toState)
+                           .Where(x => predicate == null || predicate(x))
+                           .Subscribe(onTransition);
             }
             return null;
         }
 
         #endregion
 
-        #region イベント購読
+        #region Subscription
 
-        /// <summary>
-        /// 指定ステートへの進入前イベントを購読する
-        /// </summary>
         public IObservable<TState> OnEnterEvent(TState state)
         {
             if (_disposed) return null;
-            if (!_states.TryGetValue(state, out var s)) return null;
-            return s.OnEnter;
+            return _states.TryGetValue(state, out var s) ? s.OnEnter : null;
         }
 
-        /// <summary>
-        /// 指定ステートからの退出後イベントを購読する
-        /// </summary>
         public IObservable<TState> OnExitEvent(TState state)
         {
             if (_disposed) return null;
-            if (!_states.TryGetValue(state, out var s)) return null;
-            return s.OnExit;
+            return _states.TryGetValue(state, out var s) ? s.OnExit : null;
         }
 
-        /// <summary>
-        /// ステートへの進入を許可する条件を設定
-        /// </summary>
         public IDisposable AllowEnter(TState state, Func<TState, bool> predicate)
         {
             if (_disposed) return null;
@@ -290,9 +286,6 @@ namespace HighElixir.StateMachine
             return Disposable.Empty;
         }
 
-        /// <summary>
-        /// ステートからの脱出を許可する条件を設定
-        /// </summary>
         public IDisposable AllowExit(TState state, Func<TState, bool> predicate)
         {
             if (_disposed) return null;
@@ -304,9 +297,6 @@ namespace HighElixir.StateMachine
             return Disposable.Empty;
         }
 
-        /// <summary>
-        /// 遅延遷移の実行をブロックする条件を設定
-        /// </summary>
         public IDisposable BlockCommandDequeue(TState state, Func<bool> predicate)
         {
             if (_disposed) return null;
@@ -320,54 +310,82 @@ namespace HighElixir.StateMachine
 
         #endregion
 
-        #region エラーハンドリング
+        #region Error Handling
 
-        /// <summary>
-        /// ステートマシン内部での例外発生時処理
-        /// </summary>
-        internal void OnError(Exception exception)
+        public void OnError(Exception ex)
         {
-            // 現状は即時再スロー（後にロギング等に差し替え可能）
-            ExceptionDispatchInfo.Capture(exception).Throw();
+            if (ErrorHandler != null)
+            {
+                try { ErrorHandler.Handle(ex); }
+                catch { /* 外部ハンドラ内の例外は握りつぶす */ }
+            }
+            else
+            {
+                if (_logger != null)
+                    _logger.Error(ex);
+                else
+                    ExceptionDispatchInfo.Capture(ex).Throw();
+            }
         }
-
         #endregion
 
-        #region Dispose管理
+        #region Dispose Management
 
-        private bool _disposed;
-        public bool Disposed => _disposed;
-
-        /// <summary>
-        /// ステートマシンを破棄し、すべてのステートと購読を解放する
-        /// </summary>
-        public void Dispose()
-        {
-            Dispose(true);
-        }
+        public void Dispose() => Dispose(true);
 
         private void Dispose(bool disposing)
         {
             if (_disposed) return;
+
             if (disposing)
             {
                 foreach (var item in _states.Values)
                     item.Dispose();
 
                 _cont = default;
-                _anyTransition.Clear();
+                _executor.AnyTransition.Clear();
                 _states.Clear();
                 _onTransition.Dispose();
-
                 _disposed = true;
+                _parent = null;
             }
         }
 
-        ~StateMachine()
+        ~StateMachine() => Dispose(false);
+
+        #endregion
+
+        public override string ToString()
         {
-            Dispose(false);
+            if (_disposed) return string.Empty;
+            if (_parent != null)
+            {
+                return $"{_parent.ToString()}.[{nameof(TState)}Machine]";
+            }
+            else
+            {
+                return $"[{nameof(TState)}Machine]";
+            }
         }
 
+        #region Internal Helpers
+
+        internal bool TryGetStateInfo(TState state, out StateInfo info)
+            => _states.TryGetValue(state, out info);
+
+        internal void Notify(TransitionResult transitionResult)
+        {
+            if (_disposed) return;
+            _onTransition.Value = transitionResult;
+        }
+
+        internal StateInfo CreateInfo(TState state)
+        {
+            var info = new StateInfo();
+            info.ID = state;
+            _states.Add(state, info);
+            return info;
+        }
         #endregion
     }
 }

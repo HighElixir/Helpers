@@ -5,46 +5,22 @@ using System.Collections.Generic;
 namespace HighElixir.StateMachine
 {
     public sealed partial class StateMachine<TCont, TEvt, TState>
-        where TState : IEquatable<TState>
     {
-        /// <summary>
-        /// ステートマシン内の単一ステートを表す抽象クラス
-        /// <br/>ライフサイクル・イベント購読・タグ・遷移制御などを統合
-        /// </summary>
-        public abstract class State : IDisposable
+        public class StateInfo : IDisposable
         {
+            internal ISubHost SubHost;
+            internal State<TCont> _state;
+
             /// <summary>遷移イベントマップ</summary>
             internal Dictionary<TEvt, TState> _transitionMap = new();
-
-            private readonly List<string> _tags = new();
             private ReactiveProperty<TState> _onEnter = new();
             private ReactiveProperty<TState> _onExit = new();
+            private ActionAsObservable<StateInfo> _onCompletion = new();
+            internal IDisposable _obs;
 
-            /// <summary>所属するステートマシン</summary>
+            public TState ID { get; internal set; }
+            public State<TCont> State => _state;
             public StateMachine<TCont, TEvt, TState> Parent { get; internal set; }
-
-            /// <summary>ステートに付与されたタグ一覧</summary>
-            public List<string> Tags => _tags;
-
-            /// <summary>ステートが属するコンテキスト（MonoBehaviourなど）</summary>
-            protected TCont Cont => Parent._cont;
-
-            #region ライフサイクル
-            /// <summary>
-            /// ステートに入る時に呼ばれる
-            /// </summary>
-            public virtual void Enter(TState prev) { }
-
-            /// <summary>
-            /// ステートがアクティブな間、毎フレーム呼ばれる
-            /// </summary>
-            public virtual void Update(float deltaTime) { }
-
-            /// <summary>
-            /// ステートを抜ける時に呼ばれる
-            /// </summary>
-            public virtual void Exit(TState next) { }
-            #endregion
 
             #region イベント
             /// <summary>Enter発火時の通知（Reactive）</summary>
@@ -65,7 +41,7 @@ namespace HighElixir.StateMachine
                 }
                 catch (Exception ex)
                 {
-                    Parent.OnError(ex);
+                    _state.Parent.OnError(ex);
                 }
             }
 
@@ -81,8 +57,19 @@ namespace HighElixir.StateMachine
                 }
                 catch (Exception ex)
                 {
-                    Parent.OnError(ex);
+                    _state.Parent.OnError(ex);
                 }
+            }
+
+            internal IObservable<StateInfo> ObserveAction()
+            {
+                if (_state is INotifyStateCompletion completion)
+                {
+                    _onCompletion.SetContext(this);
+                    _obs = completion.Completion.Subscribe(_ => _onCompletion.Invoke());
+                    return _onCompletion;
+                }
+                throw new FieldAccessException();
             }
             #endregion
 
@@ -121,39 +108,28 @@ namespace HighElixir.StateMachine
                 add => blockCommandDequeueFunc += value;
                 remove => blockCommandDequeueFunc -= value;
             }
-
-            /// <summary>このステートへの遷移を許可するかどうか</summary>
-            public virtual bool AllowEnter() { return true; }
-
-            /// <summary>このステートからの遷移を許可するかどうか</summary>
-            public virtual bool AllowExit() { return true; }
-
-            /// <summary>EventQueueからのコマンド処理をブロックするかどうか</summary>
-            public virtual bool BlockCommandDequeue() { return false; }
-
             #endregion
 
-            #region タグ操作
-            /// <summary>ステートにタグを追加</summary>
-            public void AddTag(string tag) => _tags.Add(tag);
-
-            /// <summary>指定したタグを削除</summary>
-            public void RemoveTag(string tag) => _tags.Remove(tag);
-
-            /// <summary>指定したタグを保持しているか</summary>
-            public bool HasTag(string tag) => _tags.Contains(tag);
-            #endregion
-
-            /// <summary>
-            /// リソース解放処理
-            /// </summary>
-            public virtual void Dispose()
+            #region
+            public void RegisterTransition(TEvt evt, TState to)
             {
-                _onEnter?.Dispose();
-                _onExit?.Dispose();
-                allowEnterFunc = null;
-                allowExitFunc = null;
-                blockCommandDequeueFunc = null;
+                _transitionMap.Add(evt, to);
+            }
+            #endregion
+
+            public void Dispose()
+            {
+                _state?.Dispose();
+                SubHost?.Dispose();
+                _obs?.Dispose();
+            }
+
+            public override string ToString()
+            {
+                if (Parent != null)
+                    return $"{Parent.ToString()}.{ID.ToString()}";
+                else
+                    return $"{ID.ToString()}";
             }
         }
     }
