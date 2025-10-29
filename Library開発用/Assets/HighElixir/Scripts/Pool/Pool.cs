@@ -269,11 +269,7 @@ namespace HighElixir.Pools
         /// </summary>
         private void LogWarning(string message)
         {
-#if UNITY_EDITOR
-            UnityEngine.Debug.LogWarning(message);
-#elif DEBUG
             Console.WriteLine("[Pool Warning] " + message);
-#endif
         }
     }
 }

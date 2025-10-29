@@ -48,12 +48,34 @@ namespace HighElixir.Implements.Observables
         /// </summary>
         public static IDisposable Join(this IDisposable source, params IDisposable[] disposables)
         {
-            return Disposable.Create(() =>
+            if (source is UniteDisposable unite)
+                return unite.Add(disposables);
+            else 
+                return new UniteDisposable(disposables);
+        }
+        public static IDisposable Join(params IDisposable[] disposables)
+        {
+            return new UniteDisposable(disposables);
+        }
+
+        private class UniteDisposable : IDisposable
+        {
+            private readonly List<IDisposable> _dis = new();
+
+            public UniteDisposable(params IDisposable[] disposables) =>
+                Add(disposables);
+
+            public IDisposable Add(params IDisposable[] disposables)
             {
-                source?.Dispose();
-                foreach (var disposable in disposables)
+                _dis.AddRange(disposables);
+                return this;
+            }
+            public void Dispose()
+            {
+                foreach (var disposable in _dis)
                     disposable?.Dispose();
-            });
+                _dis.Clear();
+            }
         }
     }
 
@@ -152,7 +174,7 @@ namespace HighElixir.Implements.Observables
     /// <summary>
     /// 戻り値を持たないアクションをObservable化
     /// </summary>
-    internal class ActionAsObservable : ReactiveProperty<byte>
+    public class ActionAsObservable : ReactiveProperty<byte>
     {
         public void Invoke() => OnNext();
     }
@@ -160,7 +182,7 @@ namespace HighElixir.Implements.Observables
     /// <summary>
     /// コンテキスト付きアクションをObservable化
     /// </summary>
-    internal class ActionAsObservable<TCont> : ReactiveProperty<TCont>
+    public class ActionAsObservable<TCont> : ReactiveProperty<TCont>
     {
         public void SetContext(TCont context) => _value = context;
         public void Invoke() => OnNext();
@@ -213,7 +235,7 @@ namespace HighElixir.Implements.Observables
             else
                 _predicate = predicate;
 
-            return _observable;
+            return this;
         }
 
         /// <summary>スキップ回数を設定</summary>

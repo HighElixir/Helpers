@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 using System.Text.RegularExpressions;
 
 namespace HighElixir
@@ -15,8 +16,10 @@ namespace HighElixir
                 : NumberTagPattern.Replace(input, string.Empty);
         public static void AutoRename(ref Dictionary<string, string> names)
         {
+            if (names == null) return;
             Dictionary<string, int> nameCounts = new Dictionary<string, int>();
-            foreach (var key in names.Keys)
+            var keys = names.Keys.ToArray();
+            foreach (var key in keys)
             {
                 string originalBaseName = names[key].RemoveNumericTags();
                 string baseName = originalBaseName.ToLower();

@@ -1,4 +1,4 @@
-﻿using HighElixir.UI.Countable;
+﻿using HighElixir.Unity.UI.Countable;
 using UniRx;
 using UnityEngine;
 

@@ -1,7 +1,7 @@
 ﻿using UnityEditor;
 using UnityEngine;
 
-namespace HighElixir.UI.Countable.Editor
+namespace HighElixir.Unity.UI.Countable.Editor
 {
     [CustomEditor(typeof(CountableSwitch))]
     public class CountableSwitchEditor : UnityEditor.Editor
