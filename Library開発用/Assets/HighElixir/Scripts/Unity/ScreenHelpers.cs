@@ -5,12 +5,14 @@ namespace HighElixir
     public static class ScreenHelpers
     {
         public static Vector2 WorldToUILocalPos(Vector3 worldPos, Camera camera, Canvas canvas)
+            => WorldToUILocalPos(worldPos, camera, canvas.GetComponent<RectTransform>(), canvas.renderMode);
+        public static Vector2 WorldToUILocalPos(Vector3 worldPos, Camera camera, RectTransform parentRect, RenderMode renderMode = RenderMode.ScreenSpaceOverlay)
         {
-            var screenPos = RectTransformUtility.WorldToScreenPoint(camera, worldPos);
+            var screenPos = camera.WorldToScreenPoint(worldPos);
             if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                    canvas.transform as RectTransform,
+                    parentRect,
                     screenPos,
-                    canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : camera,
+                    renderMode == RenderMode.ScreenSpaceOverlay ? null : camera,
                     out var localPos
                 ))
             {

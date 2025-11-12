@@ -6,15 +6,15 @@ namespace HighElixir.StateMachine
 {
     public sealed partial class StateMachine<TCont, TEvt, TState>
     {
-        public class StateInfo : IDisposable
+        public class StateInfo : IStateInfo<TCont>, IDisposable
         {
-            internal ISubHost SubHost;
+            internal ISubHostBase<TCont, TEvt> SubHost;
             internal State<TCont> _state;
 
             /// <summary>遷移イベントマップ</summary>
             internal Dictionary<TEvt, TState> _transitionMap = new();
-            private ReactiveProperty<TState> _onEnter = new();
-            private ReactiveProperty<TState> _onExit = new();
+            private ReactiveProperty<IStateInfo<TCont>> _onEnter = new();
+            private ReactiveProperty<IStateInfo<TCont>> _onExit = new();
             private ActionAsObservable<StateInfo> _onCompletion = new();
             internal IDisposable _obs;
 
@@ -24,16 +24,18 @@ namespace HighElixir.StateMachine
 
             #region イベント
             /// <summary>Enter発火時の通知（Reactive）</summary>
-            public IObservable<TState> OnEnter => _onEnter;
+            public IObservable<IStateInfo<TCont>> OnEnter => _onEnter;
 
             /// <summary>Exit発火時の通知（Reactive）</summary>
-            public IObservable<TState> OnExit => _onExit;
+            public IObservable<IStateInfo<TCont>> OnExit => _onExit;
+
+            public bool Binded => State != null;
 
             /// <summary>
             /// Enterの前に呼ばれる
             /// </summary>
             /// <param name="prev">前のステート</param>
-            internal void InvokeEnterAction(TState prev)
+            internal void InvokeEnterAction(IStateInfo<TCont> prev)
             {
                 try
                 {
@@ -49,7 +51,7 @@ namespace HighElixir.StateMachine
             /// Exitの後に呼ばれる
             /// </summary>
             /// <param name="next">次のステート</param>
-            internal void InvokeExitAction(TState next)
+            internal void InvokeExitAction(IStateInfo<TCont> next)
             {
                 try
                 {
@@ -75,15 +77,15 @@ namespace HighElixir.StateMachine
 
             #region 遷移許可
 
-            internal Func<TState, bool> allowEnterFunc;
-            internal Func<TState, bool> allowExitFunc;
+            internal Func<IStateInfo<TCont>, bool> allowEnterFunc; // 前のステート
+            internal Func<IStateInfo<TCont>, bool> allowExitFunc; // 次のステート
             internal Func<bool> blockCommandDequeueFunc;
 
             /// <summary>
             /// ステート自身の<see cref="AllowEnter"/>よりも先に呼ばれる
             /// <br/>TState => Preview State
             /// </summary>
-            public event Func<TState, bool> AllowEnterFunc
+            public event Func<IStateInfo<TCont>, bool> AllowEnterFunc
             {
                 add => allowEnterFunc += value;
                 remove => allowEnterFunc -= value;
@@ -93,7 +95,7 @@ namespace HighElixir.StateMachine
             /// ステート自身の<see cref="AllowExit"/>よりも先に呼ばれる
             /// <br/>TState => Next State
             /// </summary>
-            public event Func<TState, bool> AllowExitFunc
+            public event Func<IStateInfo<TCont>, bool> AllowExitFunc
             {
                 add => allowExitFunc += value;
                 remove => allowExitFunc -= value;

@@ -1,5 +1,4 @@
-﻿using System.Threading;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using UnityEngine;
 
 namespace HighElixir.Unity.Tasks
@@ -9,7 +8,7 @@ namespace HighElixir.Unity.Tasks
         public static Task AsTask(this AsyncOperation op)
         {
             var tcs = new TaskCompletionSource<bool>();
-            op.GetAwaiter().OnCompleted(() => tcs.SetResult(true));
+            op.completed += _ => tcs.SetResult(true);
             return tcs.Task;
         }
     }

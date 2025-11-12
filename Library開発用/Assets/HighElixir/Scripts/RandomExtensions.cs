@@ -45,6 +45,20 @@ namespace HighElixir
             => random.Chance(percent / 100.0);
         #endregion
 
+        public static int GetDir(this Random random, bool ignoreZero = true)
+        {
+            if (random == null) return 0;
+            if (!ignoreZero)
+            {
+                var value = random.Next(0, 3);
+                return value - 1;
+            }
+            else
+            {
+                return random.Chance(0.5) ? 1 : -1;
+            }
+        }
+
         #region 共有RNG代替（スレッドローカル）
         /// <summary>
         /// 確率[0,1]で true。（共有RNG代替）
@@ -73,6 +87,9 @@ namespace HighElixir
         }
 
         public static int Next() => RandomProvider.Instance.Next();
+
+        public static int GetDir(bool ignoreZero = true)
+            => RandomProvider.Instance.GetDir(ignoreZero);
         #endregion
 
         #region シードリセット

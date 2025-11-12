@@ -12,7 +12,7 @@ namespace HighElixir.StateMachine
     public interface IEventQueue<TCont, TEvt, TState> : IDisposable
     {
         QueueMode Mode { get; set; }
-        void Enqueue(TEvt item);
+        bool Enqueue(TEvt item, bool skipIfExisting);
         void Process();
     }
 
@@ -28,17 +28,31 @@ namespace HighElixir.StateMachine
             Mode = mode;
         }
 
-        public void Enqueue(TEvt item) => _queue.Enqueue(item);
+        public bool Enqueue(TEvt item, bool skipIfExisting)
+        {
+            if (!skipIfExisting || !_queue.Contains(item))
+            {
+                _queue.Enqueue(item);
+                return true;
+            }
+            return false;
+        }
 
         public void Process()
         {
+            if (_queue.Count <= 0) return;
+            int success = 0;
+            int failed = 0;
             while (_queue.Count > 0)
             {
                 var evt = _queue.Dequeue();
                 bool result = _stateMachine.Send(evt);
-                if (Mode == QueueMode.UntilSuccesses && result) return;
-                if (Mode == QueueMode.UntilFailures && !result) return;
+                if (result) success++;
+                else failed++;
+                if (Mode == QueueMode.UntilSuccesses && result) break;
+                if (Mode == QueueMode.UntilFailures && !result) break;
             }
+            _stateMachine.Logger?.Info($"[{_stateMachine.ToString()}] Execute:{success + failed}, Success:{success}, Fail:{failed}");
         }
 
         public void Dispose() => _queue.Clear();

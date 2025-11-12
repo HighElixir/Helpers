@@ -9,17 +9,16 @@ namespace HighElixir.Unity.SceneManagement
 {
     internal static class SceneLoaderAsyncInternal
     {
-        internal static async Task<Scene> SceneLoaderAsync(AsyncOperation operation, int id, CancellationToken token = default, IProgress<float> progress = null)
+        internal static async Task<Scene> SceneLoaderAsync(AsyncOperation operation, Func<Scene> scene, CancellationToken token = default, IProgress<float> progress = null)
         {
             await GetProgress(operation, token, progress);
             if (token.IsCancellationRequested)
                 throw new TaskCanceledException();
 
             var from = SceneManager.GetActiveScene();
-            var s = SceneManager.GetSceneByBuildIndex(id);
-            SceneManager.SetActiveScene(s);
+            SceneManager.SetActiveScene(scene());
             await FinalizeLoadAsync(from);
-            return s;
+            return scene();
         }
 
         internal static async Task FinalizeLoadAsync(Scene scene)

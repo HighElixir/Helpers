@@ -33,16 +33,27 @@ namespace HighElixir.StateMachine.Internal
 
         private bool ValidateTransition(StateMachine<TCont, TEvt, TState>.StateInfo from, TState to)
         {
-            if ((from.allowExitFunc != null && !from.allowExitFunc(to)) || !from.State.AllowExit())
-                return false;
+            try
+            {
+                if (!_machine.EnableSelfTransition && from.ID.Equals(to)) return false;
 
-            if (!_machine.TryGetStateInfo(to, out var toState))
-                return false;
+                if (!_machine.TryGetStateInfo(to, out var toState))
+                    return false;
+                if (!toState.Binded)
+                    throw new InvalidOperationException($"[{to} does not bind.]");
+                if ((from.allowExitFunc != null && !from.allowExitFunc(toState)) || !from.State.AllowExit())
+                    return false;
 
-            if ((toState.allowEnterFunc != null && !toState.allowEnterFunc(_machine.Current.id)) || !toState.State.AllowEnter())
-                return false;
+                if ((toState.allowEnterFunc != null && !toState.allowEnterFunc(_machine.Current.info)) || !toState.State.AllowEnter())
+                    return false;
 
-            return true;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _machine.OnError(ex);
+                return false;
+            }
         }
 
         private void Execute(StateMachine<TCont, TEvt, TState>.StateInfo from, TState to, TEvt evt)
@@ -52,11 +63,11 @@ namespace HighElixir.StateMachine.Internal
 
             // ★ 先に親のExit系、その後で子FSMを停止
             from.State.Exit();
-            from.InvokeExitAction(to);
+            from.InvokeExitAction(toState);
             from.SubHost?.OnParentExit();
 
             // ★ 次の親ステートEnter前後で子FSMを起動
-            toState.InvokeEnterAction(from.ID);
+            toState.InvokeEnterAction(from);
             toState.State.Enter();
             toState.SubHost?.OnParentEnter();
 

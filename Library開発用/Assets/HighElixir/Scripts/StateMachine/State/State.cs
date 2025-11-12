@@ -9,13 +9,13 @@ namespace HighElixir.StateMachine
     /// </summary>
     public abstract class State<TCont> : IDisposable
     {
-        private readonly List<string> _tags = new();
+        private List<string> _tags = new();
 
         /// <summary>所属するステートマシン</summary>
         public IStateMachine<TCont> Parent { get; internal set; }
 
         /// <summary>ステートに付与されたタグ一覧</summary>
-        public List<string> Tags => _tags;
+        public List<string> Tags => _tags ??= new();
 
         /// <summary>ステートが属するコンテキスト（MonoBehaviourなど）</summary>
         protected TCont Cont => Parent.Context;

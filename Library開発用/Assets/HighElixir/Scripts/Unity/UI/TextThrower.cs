@@ -42,18 +42,18 @@ namespace HighElixir.Unity.UI
 
         public TMP_Text Create(GameObject go, string text, Color color)
         {
-            Vector2 localPos;
+            Vector2 anchored;
             // UI 要素ならそのままアンカー位置を使う
             if (go.TryGetComponent<RectTransform>(out var rt))
             {
-                localPos = rt.anchoredPosition;
+                anchored = rt.anchoredPosition;
             }
             else
             {
-                localPos = ScreenHelpers.WorldToUILocalPos(go.transform.position, _camera, uiCanvas);
+                anchored = ScreenHelpers.WorldToUILocalPos(go.transform.position, _camera, uiCanvas);
             }
 
-            return Create(localPos, Quaternion.identity, text, color);
+            return Create(anchored, Quaternion.identity, text, color);
         }
 
         // Vector2 版

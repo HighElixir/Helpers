@@ -1,4 +1,5 @@
 ﻿using HighElixir.Implements;
+using HighElixir.Implements.Observables;
 using HighElixir.Timers.Internal;
 using System;
 using System.Collections.Generic;
@@ -204,7 +205,15 @@ namespace HighElixir.Timers
             {
                 return t.TimeReactive;
             }
-            return null;
+            return new Empty<TimeData>();
+        }
+        public IObservable<float> GetCurrentReactive(TimerTicket ticket)
+        {
+            if (TryGetTimer(ticket, out var t))
+            {
+                return t.TimeReactive.Convert(x => x.Current);
+            }
+            return new Empty<float>();
         }
 
         /// <summary>

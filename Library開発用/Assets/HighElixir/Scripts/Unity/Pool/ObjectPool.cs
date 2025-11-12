@@ -60,6 +60,10 @@ namespace HighElixir.Unity.Pools
                 _pool.Initialize();
         }
 
+        public T Get() => _pool.Get();
+
+        public void Release(T obj) => _pool.Release(obj);
+
         #region Unity Object Handling
         private void SetActive(T obj, bool active)
         {

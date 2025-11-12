@@ -11,7 +11,7 @@ namespace HighElixir.Unity.SearchSystems
         {
             public string SystemName;
 
-            [SerializeReference]
+            [SerializeReference, SerializeReferenceSelector]
             public List<ISearchComponent> Components = new();
 
             public List<TTarget> Execute(TCont cont, List<TTarget> targets)
