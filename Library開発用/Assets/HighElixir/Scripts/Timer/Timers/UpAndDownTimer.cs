@@ -2,7 +2,7 @@
 
 namespace HighElixir.Timers.Internal
 {
-    internal class UpAndDownTimer : InternalTimerBase, IUpAndDown
+    public class UpAndDownTimer : TimerBase, IUpAndDown
     {
         public override float NormalizedElapsed => Math.Clamp(Current / InitialTime, 0, 1);
         public override bool IsFinished => !IsRunning && (Current <= 0 || Current >= InitialTime);
@@ -14,8 +14,9 @@ namespace HighElixir.Timers.Internal
         public event Action<bool> OnReversed;
         public UpAndDownTimer(TimerConfig config) : base(config)
         {
-            if (config.Duration <= 0f) OnError(new ArgumentOutOfRangeException(nameof(config.Duration)));
-            InitialTime = config.Duration;
+            if (config.InitializeTime <= 0f) OnError(new ArgumentOutOfRangeException(nameof(config.InitializeTime)));
+            IsReversing = config.ArgumentTime == 0;
+            InitialTime = config.InitializeTime;
         }
 
         public override void Reset()
@@ -64,7 +65,7 @@ namespace HighElixir.Timers.Internal
         }
     }
 
-    internal sealed class TickUpAndDownTimer : UpAndDownTimer
+    public sealed class TickUpAndDownTimer : UpAndDownTimer
     {
         public override float NormalizedElapsed => Current / InitialTime;
         public override bool IsFinished => !IsRunning && (Current <= 0 || Current >= InitialTime);

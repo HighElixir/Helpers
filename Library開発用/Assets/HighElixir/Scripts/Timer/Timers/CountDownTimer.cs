@@ -2,7 +2,7 @@
 
 namespace HighElixir.Timers.Internal
 {
-    internal class CountDownTimer : InternalTimerBase
+    public class CountDownTimer : TimerBase
     {
         public override float NormalizedElapsed => Current <= 0f ? 1f : 1f - Math.Clamp(Current / InitialTime, 0f, 1f);
 
@@ -13,8 +13,8 @@ namespace HighElixir.Timers.Internal
         public CountDownTimer(TimerConfig config) :
             base(config)
         {
-            if (config.Duration <= 0f) OnError(new ArgumentOutOfRangeException(nameof(config.Duration)));
-            InitialTime = config.Duration;
+            if (config.InitializeTime <= 0f) OnError(new ArgumentOutOfRangeException(nameof(config.InitializeTime)));
+            InitialTime = config.InitializeTime;
         }
 
         public override void Update(float dt)
@@ -34,7 +34,7 @@ namespace HighElixir.Timers.Internal
             NotifyComplete();
         }
     }
-    internal sealed class TickCountDownTimer : CountDownTimer
+    public sealed class TickCountDownTimer : CountDownTimer
     {
         public override CountType CountType => base.CountType | CountType.Tick;
 

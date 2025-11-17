@@ -2,7 +2,7 @@
 
 namespace HighElixir.Timers.Internal
 {
-    internal abstract class InternalTimerBase : ITimer
+    public abstract class TimerBase : ITimer
     {
         protected FloatReactive _reactive;
         private readonly object _lock = new();
@@ -38,7 +38,7 @@ namespace HighElixir.Timers.Internal
         public event Action OnRemoved;
 
         private Timer _timer;
-        public InternalTimerBase(TimerConfig config)
+        public TimerBase(TimerConfig config)
         {
             _timer = config.Timer;
             if (config.OnFinished != null) OnFinished += config.OnFinished;
@@ -133,7 +133,7 @@ namespace HighElixir.Timers.Internal
 
         public void OnError(System.Exception exception)
         {
-            _timer?.OnError(exception);
+            _timer?.SendError(exception);
         }
     }
 }

@@ -5,7 +5,7 @@ using System.Collections.Generic;
 namespace HighElixir.Timers.Internal
 {
     // 依存をなるべく減らすための簡易的な実装
-    internal class FloatReactive : IObservable<TimeData>, IDisposable
+    public class FloatReactive : IObservable<TimeData>, IDisposable
     {
         private readonly static float Threshold = 0.0005f;
         private readonly HashSet<IObserver<TimeData>> _observers;

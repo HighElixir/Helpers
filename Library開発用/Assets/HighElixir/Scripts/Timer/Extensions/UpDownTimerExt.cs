@@ -39,7 +39,10 @@ namespace HighElixir.Timers.Extensions
             {
                 up.ReverseDirection();
                 if (onlyNotRun && up.IsRunning) return;
-                t.Start(ticket, false, isLazy);
+                if (isLazy)
+                    t.LazySend(ticket, TimeOperation.Start);
+                else
+                    t.Send(ticket, TimeOperation.Start);
             }
         }
         public static void SetDirectionAndStart(this Timer t, TimerTicket ticket, bool isUp, bool isLazy = false, bool onlyNotRun = false)
@@ -48,7 +51,10 @@ namespace HighElixir.Timers.Extensions
             {
                 up.SetDirection(isUp);
                 if (onlyNotRun && up.IsRunning) return;
-                t.Start(ticket, false, isLazy);
+                if (isLazy)
+                    t.LazySend(ticket, TimeOperation.Start);
+                else
+                    t.Send(ticket, TimeOperation.Start);
             }
         }
 

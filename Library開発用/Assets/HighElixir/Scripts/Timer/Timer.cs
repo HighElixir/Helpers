@@ -5,7 +5,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.ExceptionServices;
-using static HighElixir.Timers.Internal.CommandQueue;
 
 // Timers.cs
 namespace HighElixir.Timers
@@ -25,7 +24,6 @@ namespace HighElixir.Timers
         // 外部
         internal readonly object _lock = new object();
         private readonly CommandQueue _commandQueue;
-        private readonly TimerFactory _timerFactory;
         private readonly IReadOnlyTimer _readonlyTimer;
 
         // スナップショット管理用
@@ -50,6 +48,8 @@ namespace HighElixir.Timers
                 }
             }
         }
+
+        public event Action<Exception> OnError { add => _onError += value; remove => _onError -= value; }
         public static IReadOnlyList<IReadOnlyTimer> AllTimers => _readOnlytimers.AsReadOnly();
 
         // TimerWatcherから監視する用の変数
@@ -59,119 +59,32 @@ namespace HighElixir.Timers
         {
             _parentName = parentName ?? UnknownType.Name;
             _readonlyTimer = new ReadOnlyTimer(this);
-            _timerFactory = new TimerFactory(this);
             _commandQueue = new CommandQueue(1000, this);
             _readOnlytimers.Add(_readonlyTimer);
         }
 
         #region 基本操作
-        /// <summary>
-        /// 進行開始。イベントや非同期から呼び出す場合は遅延実行を推奨。<br/>
-        /// 遅延実行の場合、コマンドが最大数未満の時にtrue
-        /// </summary>
-        public bool Start(TimerTicket ticket, bool init = true, bool isLazy = false)
+        public float Send(TimerTicket ticket, TimeOperation operation)
         {
-            if (!TryGetTimer(ticket, out var t)) return false;
-            if (isLazy)
+            if (TryGetTimer(ticket, out var timer))
             {
-                var command = LazyCommand.Start | (init ? LazyCommand.Init : 0);
-                return _commandQueue.Enqueue(ticket, command);
+                return timer.Operation(operation);
             }
-            if (init) t.Initialize();
-            t.Start();
-            return true;
+            return -1;
         }
 
-        /// <summary>
-        /// 再スタート。イベントや非同期から呼び出す場合は遅延実行を推奨。<br/>
-        /// 遅延実行の場合、コマンドが最大数未満の時にtrue
-        /// </summary>
-        public bool Restart(TimerTicket ticket, bool isLazy = false)
-        {
-            if (!TryGetTimer(ticket, out var t)) return false;
-            if (isLazy)
-            {
-                return _commandQueue.Enqueue(ticket, LazyCommand.Restart);
-            }
-            else
-            {
-                t.Restart();
-            }
-            return true;
-        }
-
-        /// <summary>
-        /// 停止。イベントや非同期から呼び出す場合は遅延実行を推奨。<br/>
-        /// 遅延実行の場合、コマンドが最大数未満の時にtrue
-        /// </summary>
-        public bool Stop(TimerTicket ticket, bool init = false, bool isLazy = false)
-            => Stop_Internal(ticket, out _, init, isLazy);
-
-        /// <summary>
-        /// 停止。イベントや非同期から呼び出す場合は遅延実行を推奨。<br/>
-        /// 遅延実行の場合、コマンドが最大数未満の時にtrue
-        /// </summary>
-        public bool Stop(TimerTicket ticket, out float remaining, bool init = false)
-            => Stop_Internal(ticket, out remaining, init);
-
-        private bool Stop_Internal(TimerTicket ticket, out float remaining, bool init = false, bool isLazy = false)
-        {
-            remaining = 0;
-            if (!TryGetTimer(ticket, out var t)) return false;
-            if (isLazy)
-            {
-                return _commandQueue.Enqueue(ticket, LazyCommand.Stop | (init ? LazyCommand.Init : LazyCommand.None));
-            }
-            else
-            {
-                remaining = t.Stop();
-                if (init) t.Initialize();
-            }
-            return true;
-        }
-
-        /// <summary>
-        /// リセット。イベントや非同期から呼び出す場合は遅延実行を推奨。<br/>
-        /// 遅延実行の場合、コマンドが最大数未満の時にtrue <br/>
-        /// 対象がカウントアップの場合、完了イベントが呼ばれる。
-        /// </summary>
-        public bool Reset(TimerTicket ticket, bool isLazy = false)
-        {
-            if (!TryGetTimer(ticket, out var t)) return false;
-            if (isLazy)
-            {
-                _commandQueue.Enqueue(ticket, LazyCommand.Reset);
-                return true;
-            }
-            t.Reset();
-            return true;
-        }
-
-        /// <summary>
-        /// リセット。イベントや非同期から呼び出す場合は遅延実行を推奨。<br/>
-        /// 遅延実行の場合、コマンドが最大数未満の時にtrue
-        /// </summary>
-        public bool Initialize(TimerTicket ticket, bool isLazy = false)
-        {
-            if (!TryGetTimer(ticket, out var t)) return false;
-            if (isLazy)
-            {
-                _commandQueue.Enqueue(ticket, LazyCommand.Init);
-                return true;
-            }
-            t.Initialize();
-            return true;
-        }
+        public void LazySend(TimerTicket ticket, TimeOperation operation)
+            => _commandQueue.Enqueue(ticket, operation);
         #endregion
 
         #region 登録処理
 
-        internal TimerTicket Register_Internal(CountType type, string name, float initTime, bool isTick, Action action = null, bool andStart = false)
+        public TimerTicket Register<T>(string name, float initTime, float arg = 1, Action action = null, bool andStart = false)
+            where T : ITimer
         {
             lock (_lock)
             {
-                if (isTick) type |= CountType.Tick;
-                var timer = _timerFactory.Create(type, initTime, action);
+                var timer = this.Create(typeof(T), initTime, arg, action);
                 var ticket = TimerTicket.Take(name);
                 if (andStart)
                     timer.Start();
@@ -207,14 +120,7 @@ namespace HighElixir.Timers
             }
             return new Empty<TimeData>();
         }
-        public IObservable<float> GetCurrentReactive(TimerTicket ticket)
-        {
-            if (TryGetTimer(ticket, out var t))
-            {
-                return t.TimeReactive.Convert(x => x.Current);
-            }
-            return new Empty<float>();
-        }
+
 
         /// <summary>
         /// タイマーが存在するか。
@@ -278,6 +184,8 @@ namespace HighElixir.Timers
                 float op = -1;
                 if (t.CountType.Has(CountType.Pulse))
                     op = ((PulseTimer)t).PulseCount;
+                if (t.CountType.Has(CountType.UpAndDown))
+                    op = ((UpAndDownTimer)t).IsReversing ? 1 : 0;
 
                 yield return new TimerSnapshot(ParentName, key, t, op);
             }
@@ -319,7 +227,7 @@ namespace HighElixir.Timers
             }
             catch (Exception ex)
             {
-                OnError(ex);
+                SendError(ex);
             }
         }
 
@@ -372,18 +280,18 @@ namespace HighElixir.Timers
         /// タイマーの初期値を変更。存在しなければ無視。<br/>
         /// パルスタイマーはコールバック呼び出し頻度にかかわる(他のタイマーと扱いが異なる)ため注意
         /// </summary>
-        public void ChangeDuration(TimerTicket ticket, float newDuration)
+        public void ChangeInitialTime(TimerTicket ticket, float newInitial)
         {
             lock (_lock)
             {
-                if (newDuration < 0f)
+                if (newInitial < 0f)
                 {
-                    OnError(new ArgumentException("ChangeDuration: newDuration は 0 以上である必要があります。"));
+                    SendError(new ArgumentException("ChangeDuration: newDuration は 0 以上である必要があります。"));
                     return;
                 }
                 if (_timers.TryGetValue(ticket, out var t))
                 {
-                    t.InitialTime = newDuration;
+                    t.InitialTime = newInitial;
                 }
             }
         }
@@ -395,7 +303,7 @@ namespace HighElixir.Timers
             _onError += onError;
         }
 
-        internal void OnError(Exception ex)
+        internal void SendError(Exception ex)
         {
             if (_onError != null)
                 _onError.Invoke(ex);
