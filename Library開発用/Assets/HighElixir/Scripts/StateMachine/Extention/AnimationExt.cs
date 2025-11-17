@@ -254,7 +254,8 @@ namespace HighElixir.StateMachine.Extention
         private static AnimationBinding GetWrapper<TCont>(this TCont cont, string trigger)
             where TCont : Component
         {
-            if (!cont.TryGetComponent<Animator>(out var anim))
+            if (!cont.TryGetComponent<Animator>(out var anim) &&
+                (anim = cont.GetComponentInChildren<Animator>()) == null)
                 throw new MissingComponentException($"[StateMachine_Anim]{cont.name}にAnimatorがアタッチされていません");
 
             return new AnimationBinding()
