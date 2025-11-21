@@ -13,21 +13,21 @@ namespace HighElixir.Timers
         public readonly float NormalizedElapsed;
         public readonly bool IsRunning;
         public readonly bool IsFinished;
-        public readonly CountType CountType;
+        public readonly Type CountType;
         public readonly float Optional; // PulseTypeのパルス数などを保存
 
-        public TimerSnapshot(string parentName, TimerTicket ticket, ITimer timer, float optional = -1)
+        public TimerSnapshot(string parentName, TimerTicket ticket, ITimer timer)
         {
             ParentName = parentName;
             Key = ticket.Key;
             Name = ticket.Name;
             Initialize = timer.InitialTime;
             Current = timer.Current;
-            NormalizedElapsed = timer.NormalizedElapsed;
+            NormalizedElapsed = timer is INormalizeable normalizeable ? normalizeable.NormalizedElapsed : 1f;
             IsRunning = timer.IsRunning;
             IsFinished = timer.IsFinished;
-            CountType = timer.CountType;
-            Optional = optional;
+            CountType = timer.GetType();
+            Optional = timer.ArgTime;
         }
     }
 }

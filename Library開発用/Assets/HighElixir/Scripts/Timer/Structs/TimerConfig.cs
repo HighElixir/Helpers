@@ -1,20 +1,18 @@
 ﻿using System;
 
-namespace HighElixir.Timers.Internal
+namespace HighElixir.Timers
 {
     public readonly struct TimerConfig
     {
         public readonly Timer Timer;
         public readonly float InitializeTime;
         public readonly float ArgumentTime;
-        public readonly Action OnFinished;
 
-        public TimerConfig(Timer timer, float initializeTime, float argumentTime, Action onFinished = null)
+        public TimerConfig(Timer timer, float initializeTime, float argumentTime)
         {
             Timer = timer;
             InitializeTime = initializeTime;
             ArgumentTime = argumentTime;
-            OnFinished = onFinished;
         }
     }
 }

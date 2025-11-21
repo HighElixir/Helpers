@@ -1,6 +1,6 @@
-﻿namespace HighElixir.Timers.Internal
+﻿namespace HighElixir.Timers
 {
-    public interface IPulseTimer
+    public interface IPulseTimer : INormalizeable
     {
         public int PulseCount { get; }
 

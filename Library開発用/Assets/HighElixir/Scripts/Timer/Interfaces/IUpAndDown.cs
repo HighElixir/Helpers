@@ -2,7 +2,7 @@
 
 namespace HighElixir.Timers
 {
-    public interface IUpAndDown : ITimer
+    public interface IUpAndDown : ITimer, INormalizeable
     {
         bool IsReversing { get; }
         event Action<bool> OnReversed;

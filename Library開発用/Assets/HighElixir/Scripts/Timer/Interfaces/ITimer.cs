@@ -2,7 +2,7 @@
 
 namespace HighElixir.Timers
 {
-    public interface ITimer : ITimerEvt, IDisposable
+    public interface ITimer : IDisposable
     {
         /// <summary>
         /// Reset時に戻る時間
@@ -11,12 +11,11 @@ namespace HighElixir.Timers
         float Current { get; set; }
         bool IsRunning { get; }
         bool IsFinished { get; }
-        float NormalizedElapsed { get; }
 
+        // 汎用的なオプション
+        float ArgTime { get; }
         IObservable<TimeData> TimeReactive { get; }
-        // クラスごとに固定
-        CountType CountType { get; }
-
+        IObservable<int> ReactiveTimerEvent { get; }
         void Start();
         float Stop();
 
@@ -27,9 +26,17 @@ namespace HighElixir.Timers
         // OnFinishedなどのイベントが呼ばれない
         // また、自動的にStopが呼ばれる
         void Initialize();
-
-        // リセット=>スタートの順に実行
-        void Restart();
         void Update(float dt);
+    }
+
+    // Tick数を使うことを示す
+    public interface ITick
+    {
+
+    }
+
+    public interface INormalizeable
+    {
+        float NormalizedElapsed { get; }
     }
 }
