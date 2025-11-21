@@ -1,16 +1,22 @@
 ﻿using Cysharp.Threading.Tasks;
+using HighElixir.Implements.Observables;
 using HighElixir.Timers;
+using HighElixir.Timers.Extensions;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using UnityEngine;
 
+
 namespace HighElixir.Async.Timers
 {
     /// <summary>
-    /// Timer 拡張: UniTask による非同期待機サポート
+    ///  UniTask による非同期待機サポート
     /// </summary>
+    /// <remarks>
+    /// Initialize / Resetでキャンセルされる
+    /// </remarks>
     public static class TimerExt
     {
         // チケットごとの待機状態
@@ -26,8 +32,9 @@ namespace HighElixir.Async.Timers
         /// <summary>
         /// タイマーが完了するまで待機する (UniTask.Create 版)
         /// </summary>
-        public static UniTask<TimerAsyncResult> WaitUntilFinishedAsync(this HighElixir.Timers.Timer timer, TimerTicket ticket, bool isLazy = true, CancellationToken ct = default)
+        public static UniTask<TimerAsyncResult> WaitUntilFinishedAsync(this HighElixir.Timers.Timer timer, TimerTicket ticket, bool autoStart, bool isLazy = true, CancellationToken ct = default)
         {
+            if (autoStart) timer.Start(ticket);
             return UniTask.Create<TimerAsyncResult>(async () =>
             {
                 // 遅延開始対応（Startされるまで待機）
@@ -47,15 +54,15 @@ namespace HighElixir.Async.Timers
 
                 // イベント取得
                 var tevt = timer.GetTimerEvt(ticket);
-                Action onFinished = () => NotifyFinished(ticket);
-                Action onRemoved = () => OnRemoved(ticket);
-                Action onReset = () => BumpGenerationAndCancelWaiters(ticket);
-                Action onInit = () => BumpGenerationAndCancelWaiters(ticket);
-
-                tevt.OnFinished += onFinished;
-                tevt.OnRemoved += onRemoved;
-                tevt.OnReset += onReset;
-                tevt.OnInitialized += onInit;
+                var dispose = tevt.Subscribe(id =>
+                {
+                    if (TimerEventRegistry.HasAny(id, TimeEventType.Initialize, TimeEventType.Reset))
+                        BumpGenerationAndCancelWaiters(ticket);
+                    if (TimerEventRegistry.Equals(id, TimeEventType.Finished))
+                        NotifyFinished(ticket);
+                    if (TimerEventRegistry.Equals(id, TimeEventType.OnRemoved))
+                        OnRemoved(ticket);
+                });
 
                 // 待機用TCS作成
                 var tcs = new UniTaskCompletionSource<bool>();
@@ -75,7 +82,7 @@ namespace HighElixir.Async.Timers
                             lock (st.FinishWaiters)
                                 st.FinishWaiters.Remove(tcs);
                         }
-                        DetachAll(tevt, onFinished, onRemoved, onReset, onInit);
+                        dispose.Dispose();
                         return TimerAsyncResult.Canceled;
                     }
 
@@ -118,7 +125,7 @@ namespace HighElixir.Async.Timers
                     Debug.Log($"[TimerExt] finally: {ticket.Name}");
 #endif
                     reg.Dispose();
-                    DetachAll(tevt, onFinished, onRemoved, onReset, onInit);
+                    dispose.Dispose();
                 }
                 return result;
             });
@@ -163,15 +170,6 @@ namespace HighElixir.Async.Timers
 
                 _awaits.TryRemove(ticket, out _);
             }
-        }
-
-        /// <summary>登録解除共通化</summary>
-        private static void DetachAll(ITimerEvt tevt, Action onFinished, Action onRemoved, Action onReset, Action onInit)
-        {
-            tevt.OnFinished -= onFinished;
-            tevt.OnRemoved -= onRemoved;
-            tevt.OnReset -= onReset;
-            tevt.OnInitialized -= onInit;
         }
 
         /// <summary>Waiterリストを安全にクリアして取得</summary>

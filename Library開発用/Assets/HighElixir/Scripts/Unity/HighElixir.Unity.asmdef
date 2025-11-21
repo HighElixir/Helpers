@@ -2,7 +2,8 @@
     "name": "HighElixir.Unity",
     "rootNamespace": "HighElixir.Unity",
     "references": [
-        "GUID:3151164fd1f9d9a459a35d877bf09d55"
+        "GUID:a3585fec8ad674c4e811e8ee138d424b",
+        "GUID:f38f8d6027bc17b4cb260304d9470735"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

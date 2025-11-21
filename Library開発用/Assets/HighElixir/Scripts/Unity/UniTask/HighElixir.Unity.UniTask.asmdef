@@ -1,10 +1,9 @@
 {
-    "name": "HighElixir.DoTween",
+    "name": "HighElixir.Unity.UniTask",
     "rootNamespace": "",
     "references": [
-        "GUID:c9c7c4b00a0a77f499cbea7db7ce37d0",
+        "GUID:a3585fec8ad674c4e811e8ee138d424b",
         "GUID:f51ebe6a0ceec4240a699833d6309b23",
-        "GUID:029c1c1b674aaae47a6841a0b89ad80e",
         "GUID:f38f8d6027bc17b4cb260304d9470735"
     ],
     "includePlatforms": [],
@@ -13,9 +12,7 @@
     "overrideReferences": false,
     "precompiledReferences": [],
     "autoReferenced": true,
-    "defineConstraints": [
-        "DOTWEEN"
-    ],
+    "defineConstraints": [],
     "versionDefines": [],
     "noEngineReferences": false
 }
