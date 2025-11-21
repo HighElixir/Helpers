@@ -7,7 +7,7 @@ namespace HighElixir.Editors
 {
     public static class LinkedFileNameMenu
     {
-        [MenuItem("HighElixir/RenameAssets")]
+        [MenuItem("Tools/HighElixir/RenameAssets")]
         public static void Rename()
         {
             int succesed = 0, failed = 0;
