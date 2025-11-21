@@ -2,7 +2,6 @@
     "name": "HighElixir.Sample",
     "rootNamespace": "",
     "references": [
-        "GUID:3151164fd1f9d9a459a35d877bf09d55",
         "GUID:a3585fec8ad674c4e811e8ee138d424b",
         "GUID:c88c6b3e09110d544945b429fb1d0c03",
         "GUID:cc4602d02a189d2408a9366f01305ae8",
@@ -11,7 +10,8 @@
         "GUID:f51ebe6a0ceec4240a699833d6309b23",
         "GUID:db8429dbc367a7347aa9ce1a84ddeb6f",
         "GUID:730a75ce3820e6243b07b35774416725",
-        "GUID:75469ad4d38634e559750d17036d5f7c"
+        "GUID:75469ad4d38634e559750d17036d5f7c",
+        "GUID:f38f8d6027bc17b4cb260304d9470735"
     ],
     "includePlatforms": [
         "Android",
