@@ -3,7 +3,7 @@ using HighElixir.Implements.Observables;
 using System;
 using System.Collections.Generic;
 
-namespace HighElixir.StateMachine.Extention
+namespace HighElixir.StateMachine.Extension
 {
     /// <summary>
     /// ステートマシンのイベント購読・フィルタリング拡張

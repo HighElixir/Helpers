@@ -1,14 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace HighElixir.StateMachine
 {
     public interface ISubHostBase<TCont, TEvt> : IDisposable
     {
-        void OnParentEnter();
+        Task OnParentEnter();
         void OnParentExit();
-        void Update(float dt);
-        bool TrySend(TEvt evt);
+        Task Update(float dt);
+        Task<bool> TrySend(TEvt evt);
         bool TryGetCurrentSubHost(out ISubHostBase<TCont, TEvt> subHost);
         bool ForwardFirst { get; }
 

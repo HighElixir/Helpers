@@ -1,6 +1,7 @@
 ﻿using HighElixir.Implements.Observables;
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace HighElixir.StateMachine
 {
@@ -46,17 +47,17 @@ namespace HighElixir.StateMachine
                 OnExitResetState = options?.OnExitResetState ?? true;
             }
 
-            public void OnParentEnter()
+            public async Task OnParentEnter()
             {
                 if (!_sub.Awaked)
-                    _sub.Awake(_initial);
+                    await _sub.Awake(_initial);
                 else
-                    _sub.Start();
+                    await _sub.Start();
 
                 var disList = new List<IDisposable>();
                 foreach (var kv in _exitMap)
                 {
-                    var disp = _sub.OnEnterEvent(kv.Key)?.Subscribe(_ =>
+                    var disp = _sub.GetObservableState(kv.Key)?.Where(evt => evt == EventState.Entering).Subscribe(_ =>
                     {
                         try { _parent.LazySend(kv.Value); }
                         catch (Exception ex) { _parent.OnError(ex); }
@@ -68,9 +69,9 @@ namespace HighElixir.StateMachine
 
             public void OnParentExit() => _sub.Pause(OnExitResetState);
 
-            public void Update(float dt) => _sub.Update(dt);
+            public async Task Update(float dt) => await _sub.Update(dt);
 
-            public bool TrySend(TEvt evt) => _sub.Send(evt);
+            public async Task<bool> TrySend(TEvt evt) => await _sub.Send(evt);
 
             public void Dispose()
             {

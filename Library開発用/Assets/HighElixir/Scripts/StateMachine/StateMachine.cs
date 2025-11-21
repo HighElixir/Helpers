@@ -1,11 +1,13 @@
 ﻿using HighElixir.Implements;
 using HighElixir.Implements.Observables;
 using HighElixir.Loggings;
-using HighElixir.StateMachine.Extention;
+using HighElixir.StateMachine.Extension;
 using HighElixir.StateMachine.Internal;
+using HighElixir.StateMachine.Thead;
 using System;
 using System.Collections.Generic;
 using System.Runtime.ExceptionServices;
+using System.Threading.Tasks;
 
 namespace HighElixir.StateMachine
 {
@@ -104,7 +106,7 @@ namespace HighElixir.StateMachine
         /// ステートマシンを初期化して起動する。
         /// 指定された初期ステートが未登録なら例外を投げる。
         /// </summary>
-        public void Awake(TState initialState)
+        public async Task Awake(TState initialState)
         {
             if (!_states.ContainsKey(initialState))
                 throw new ArgumentNullException($"[StateMachine]初期ステート {initialState} が存在しません");
@@ -123,7 +125,7 @@ namespace HighElixir.StateMachine
             }
 
             Reset();
-            Start();
+            await Start();
         }
 
         /// <summary>
@@ -137,17 +139,17 @@ namespace HighElixir.StateMachine
         }
 
         /// <summary> 一時停止中のマシンを再開する。 </summary>
-        public void Resume() => Start();
+        public async Task Resume() => await Start();
 
         /// <summary>
         /// 起動処理。初期ステートをアクティブにして開始する。
         /// </summary>
-        private void Start()
+        private async Task Start()
         {
             if (!_states.ContainsKey(_initial)) return;
             try
             {
-                _current.info.State.Enter();
+                await StateExecuter.StateEnter(_current.info);
                 _current.info.SubHost?.OnParentEnter();
                 IsRunning = true;
             }
@@ -170,16 +172,23 @@ namespace HighElixir.StateMachine
         /// ステートマシンの定期更新処理。
         /// イベントキュー処理や状態更新を実行。
         /// </summary>
-        public void Update(float deltaTime = 0f)
+        public async Task Update(float deltaTime = 0f)
         {
             if (_disposed || !Awaked || !IsRunning) return;
             var s = _current.info;
 
             // キュー処理がブロックされていなければ実行
             if ((s.blockCommandDequeueFunc == null || !s.blockCommandDequeueFunc()) && !s.State.BlockCommandDequeue())
-                _queue.Process();
+                await _queue.Process();
 
-            s.State.Update(deltaTime);
+            if (s.State is StateAsync<TCont> asyncState)
+            {
+                await asyncState.UpdateAsync();
+            }
+            else
+            {
+                s.State.Update(deltaTime);
+            }
             s.SubHost?.Update(deltaTime);
         }
         #endregion
@@ -189,20 +198,20 @@ namespace HighElixir.StateMachine
         /// イベントを即時送信して遷移を試みる。
         /// サブホスト設定に応じて優先転送を行う。
         /// </summary>
-        public bool Send(TEvt evt)
+        public async Task<bool> Send(TEvt evt)
         {
             if (_disposed || !Awaked) return false;
             var s = Current.info;
 
             try
             {
-                if (s.SubHost != null && s.SubHost.ForwardFirst && s.SubHost.TrySend(evt))
+                if (s.SubHost != null && s.SubHost.ForwardFirst && await s.SubHost.TrySend(evt))
                     return true;
 
-                if (!_executor.TryTransition(evt))
+                if (!await _executor.TryTransition(evt))
                 {
                     if (s.SubHost != null && !s.SubHost.ForwardFirst)
-                        return s.SubHost.TrySend(evt);
+                        return await s.SubHost.TrySend(evt);
                     return false;
                 }
                 return true;
@@ -333,44 +342,24 @@ namespace HighElixir.StateMachine
         #endregion
 
         #region Subscription
-        /// <summary> ステートのEnterイベントを購読する。 </summary>
-        public IObservable<IStateInfo<TCont>> OnEnterEvent(TState state)
+        /// <summary> ステートのEnter / Exitイベントを購読する。 </summary>
+        public IObservable<EventState> GetObservableState(TState state)
         {
             if (_disposed) return null;
             var info = GetOrCreate(state);
-            return info.OnEnter;
-        }
-
-        /// <summary> ステートのExitイベントを購読する。 </summary>
-        public IObservable<IStateInfo<TCont>> OnExitEvent(TState state)
-        {
-            if (_disposed) return null;
-            var info = GetOrCreate(state);
-            return info.OnExit;
+            return info._onTrans;
         }
 
         /// <summary>
-        /// Enter許可条件を追加する。
-        /// 条件を満たさない場合、遷移はブロックされる。
+        /// 遷移許可条件を追加する。
+        /// 条件がfalseの場合、ステートの遷移を拒否。
         /// </summary>
-        public IDisposable AllowEnter(TState state, Func<IStateInfo<TCont>, bool> predicate)
+        public IDisposable AllowTrans(TState state, Func<EventState, bool> predicate)
         {
-            if (_disposed) return null;
+            if (_disposed) return Disposable.Empty;
             var s = GetOrCreate(state);
-            s.AllowEnterFunc += predicate;
-            return Disposable.Create(() => s.AllowEnterFunc -= predicate);
-        }
-
-        /// <summary>
-        /// Exit許可条件を追加する。
-        /// 条件がfalseの場合、ステートの離脱を拒否。
-        /// </summary>
-        public IDisposable AllowExit(TState state, Func<IStateInfo<TCont>, bool> predicate)
-        {
-            if (_disposed) return null;
-            var s = GetOrCreate(state);
-            s.AllowExitFunc += predicate;
-            return Disposable.Create(() => s.AllowExitFunc -= predicate);
+            s.AllowTrans += predicate;
+            return Disposable.Create(() => s.AllowTrans -= predicate);
         }
 
         /// <summary>
@@ -405,6 +394,8 @@ namespace HighElixir.StateMachine
         #endregion
 
         #region Dispose Management
+        public bool IsDisposed => _disposed;
+
         /// <summary> 破棄処理。内部リソースを解放。 </summary>
         public void Dispose() => Dispose(true);
 

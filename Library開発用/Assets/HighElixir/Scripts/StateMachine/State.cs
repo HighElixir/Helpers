@@ -7,7 +7,7 @@ namespace HighElixir.StateMachine
     /// ステートマシン内の単一ステートを表す抽象クラス
     /// <br/>ライフサイクル・イベント購読・タグ・遷移制御などを統合
     /// </summary>
-    public abstract class State<TCont> : IDisposable
+    public abstract class State<TCont> : IState<TCont>, IDisposable
     {
         private List<string> _tags = new();
 
@@ -41,10 +41,7 @@ namespace HighElixir.StateMachine
         #region 遷移許可
 
         /// <summary>このステートへの遷移を許可するかどうか</summary>
-        public virtual bool AllowEnter() { return true; }
-
-        /// <summary>このステートからの遷移を許可するかどうか</summary>
-        public virtual bool AllowExit() { return true; }
+        public virtual bool AllowTrans(EventState state) { return true; }
 
         /// <summary>EventQueueからのコマンド処理をブロックするかどうか</summary>
         public virtual bool BlockCommandDequeue() { return false; }
@@ -67,6 +64,11 @@ namespace HighElixir.StateMachine
         /// </summary>
         public virtual void Dispose()
         {
+        }
+
+        public void SetParent(IStateMachine<TCont> parent)
+        {
+            Parent = parent;
         }
     }
 

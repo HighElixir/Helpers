@@ -1,7 +1,7 @@
 ﻿using HighElixir.Implements.Observables;
 using System;
 
-namespace HighElixir.StateMachine.Helpers
+namespace HighElixir.StateMachine.Extension
 {
     public static class TransitionLogger
     {

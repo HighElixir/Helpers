@@ -2,7 +2,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace HighElixir.StateMachine.Extention
+namespace HighElixir.StateMachine.Extension
 {
     public static class StateMachineEventExtensions
     {
@@ -15,7 +15,7 @@ namespace HighElixir.StateMachine.Extention
         {
             await Task.Delay(delay, token);
             if (!token.IsCancellationRequested)
-                stateMachine.Send(evt);
+                await stateMachine.Send(evt);
         }
 
         public static async Task SendEventWithDelayAsync<TCont, TEvt, TState>(
@@ -43,24 +43,24 @@ namespace HighElixir.StateMachine.Extention
             this StateMachine<TCont, TEvt, TState> stateMachine,
             TEvt evt,
             TimeSpan lockDuration,
-            Func<IStateInfo<TCont>, bool> lockPredicate,
+            Func<EventState, bool> lockPredicate,
             CancellationToken token = default,
             Action onUnlock = null)
         {
             if (stateMachine.TryGetStateInfo(evt, out IStateInfo<TCont> stateInfo))
             {
-                if (!stateMachine.Send(evt))
+                if (!await stateMachine.Send(evt))
                     return;
 
-                stateInfo.AllowExitFunc += lockPredicate;
+                stateInfo.AllowTrans += lockPredicate;
                 await Task.Delay(lockDuration, token);
                 if (stateInfo != null)
-                    stateInfo.AllowExitFunc -= lockPredicate;
+                    stateInfo.AllowTrans -= lockPredicate;
                 onUnlock?.Invoke();
             }
         }
 
-        private static bool DefaultLockGuard<TCont>(IStateInfo<TCont> stateInfo) => false;
+        private static bool DefaultLockGuard(EventState stateInfo) => false;
         #endregion
     }
 }

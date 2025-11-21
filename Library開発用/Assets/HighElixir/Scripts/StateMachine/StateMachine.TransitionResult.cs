@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace HighElixir.StateMachine
+﻿namespace HighElixir.StateMachine
 {
     public sealed partial class StateMachine<TCont, TEvt, TState>
 

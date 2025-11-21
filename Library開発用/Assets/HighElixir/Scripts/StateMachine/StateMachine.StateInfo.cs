@@ -13,8 +13,7 @@ namespace HighElixir.StateMachine
 
             /// <summary>遷移イベントマップ</summary>
             internal Dictionary<TEvt, TState> _transitionMap = new();
-            private ReactiveProperty<IStateInfo<TCont>> _onEnter = new();
-            private ReactiveProperty<IStateInfo<TCont>> _onExit = new();
+            internal ReactiveProperty<EventState> _onTrans = new();
             private ActionAsObservable<StateInfo> _onCompletion = new();
             internal IDisposable _obs;
 
@@ -22,47 +21,7 @@ namespace HighElixir.StateMachine
             public State<TCont> State => _state;
             public StateMachine<TCont, TEvt, TState> Parent { get; internal set; }
 
-            #region イベント
-            /// <summary>Enter発火時の通知（Reactive）</summary>
-            public IObservable<IStateInfo<TCont>> OnEnter => _onEnter;
-
-            /// <summary>Exit発火時の通知（Reactive）</summary>
-            public IObservable<IStateInfo<TCont>> OnExit => _onExit;
-
             public bool Binded => State != null;
-
-            /// <summary>
-            /// Enterの前に呼ばれる
-            /// </summary>
-            /// <param name="prev">前のステート</param>
-            internal void InvokeEnterAction(IStateInfo<TCont> prev)
-            {
-                try
-                {
-                    _onEnter.Value = prev;
-                }
-                catch (Exception ex)
-                {
-                    _state.Parent.OnError(ex);
-                }
-            }
-
-            /// <summary>
-            /// Exitの後に呼ばれる
-            /// </summary>
-            /// <param name="next">次のステート</param>
-            internal void InvokeExitAction(IStateInfo<TCont> next)
-            {
-                try
-                {
-                    _onExit.Value = next;
-                }
-                catch (Exception ex)
-                {
-                    _state.Parent.OnError(ex);
-                }
-            }
-
             internal IObservable<StateInfo> ObserveAction()
             {
                 if (_state is INotifyStateCompletion completion)
@@ -73,32 +32,16 @@ namespace HighElixir.StateMachine
                 }
                 throw new FieldAccessException();
             }
-            #endregion
 
             #region 遷移許可
 
-            internal Func<IStateInfo<TCont>, bool> allowEnterFunc; // 前のステート
-            internal Func<IStateInfo<TCont>, bool> allowExitFunc; // 次のステート
+            internal Func<EventState, bool> allowTransFunc;
             internal Func<bool> blockCommandDequeueFunc;
 
-            /// <summary>
-            /// ステート自身の<see cref="AllowEnter"/>よりも先に呼ばれる
-            /// <br/>TState => Preview State
-            /// </summary>
-            public event Func<IStateInfo<TCont>, bool> AllowEnterFunc
+            public event Func<EventState, bool> AllowTrans
             {
-                add => allowEnterFunc += value;
-                remove => allowEnterFunc -= value;
-            }
-
-            /// <summary>
-            /// ステート自身の<see cref="AllowExit"/>よりも先に呼ばれる
-            /// <br/>TState => Next State
-            /// </summary>
-            public event Func<IStateInfo<TCont>, bool> AllowExitFunc
-            {
-                add => allowExitFunc += value;
-                remove => allowExitFunc -= value;
+                add => allowTransFunc += value;
+                remove => allowTransFunc -= value;
             }
 
             /// <summary>
@@ -132,6 +75,11 @@ namespace HighElixir.StateMachine
                     return $"{Parent.ToString()}.{ID.ToString()}";
                 else
                     return $"{ID.ToString()}";
+            }
+
+            public IDisposable Subscribe(IObserver<EventState> observer)
+            {
+                return _onTrans.Subscribe(observer);
             }
         }
     }

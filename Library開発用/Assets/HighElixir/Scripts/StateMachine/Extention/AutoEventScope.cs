@@ -1,15 +1,15 @@
 ﻿using System;
 
-namespace HighElixir.StateMachine.Helpers
+namespace HighElixir.StateMachine.Extension
 {
     public static class AutoEventScope
     {
-        public  static IDisposable SendWith<TCont, TEvt, TState>(this StateMachine<TCont, TEvt, TState> s, TEvt evt, TEvt after, bool isLazy)
+        public static IDisposable SendWith<TCont, TEvt, TState>(this StateMachine<TCont, TEvt, TState> s, TEvt evt, TEvt after, bool isLazy)
         {
-            s.Send(evt);
+            _ = s.Send(evt);
             return new Sender<TCont, TEvt, TState>(s, after, isLazy);
         }
-        public  static IDisposable LazySendWith<TCont, TEvt, TState>(this StateMachine<TCont, TEvt, TState> s, TEvt evt, TEvt after, bool isLazy)
+        public static IDisposable LazySendWith<TCont, TEvt, TState>(this StateMachine<TCont, TEvt, TState> s, TEvt evt, TEvt after, bool isLazy)
         {
             s.LazySend(evt);
             return new Sender<TCont, TEvt, TState>(s, after, isLazy);
@@ -35,7 +35,7 @@ namespace HighElixir.StateMachine.Helpers
         {
             if (_disposed) return;
             if (!_isLazy)
-                _state.Send(_event);
+                _ = _state.Send(_event);
             else
                 _state.LazySend(_event);
             _disposed = true;
