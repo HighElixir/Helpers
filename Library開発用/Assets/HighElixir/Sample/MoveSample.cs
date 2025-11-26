@@ -1,4 +1,4 @@
-﻿using HighElixir.StateMachine;
+﻿using HighElixir.StateMachines;
 using HighElixir.Unity.Loggings;
 using System;
 using UniRx;

@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace HighElixir.StateMachine
+namespace HighElixir.StateMachines
 {
     /// <summary>
     /// ステートマシン内の単一ステートを表す抽象クラス

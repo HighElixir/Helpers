@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace HighElixir.StateMachine
+namespace HighElixir.StateMachines
 {
     public interface ISubHostBase<TCont, TEvt> : IDisposable
     {

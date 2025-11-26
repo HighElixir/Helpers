@@ -1,6 +1,6 @@
 ﻿using HighElixir.Implements.Observables;
-using HighElixir.StateMachine;
-using HighElixir.StateMachine.Extension;
+using HighElixir.StateMachines;
+using HighElixir.StateMachines.Extension;
 using System;
 using System.Collections.Generic;
 using UnityEngine;

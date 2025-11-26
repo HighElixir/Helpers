@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace HighElixir.StateMachine
+namespace HighElixir.StateMachines
 {
     // TState TEvtに依存しないステート情報
     public interface IStateInfo<TCont> : IObservable<EventState>

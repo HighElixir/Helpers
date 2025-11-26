@@ -2,7 +2,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace HighElixir.StateMachine.Extension
+namespace HighElixir.StateMachines.Extension
 {
     public static class StateMachineEventExtensions
     {

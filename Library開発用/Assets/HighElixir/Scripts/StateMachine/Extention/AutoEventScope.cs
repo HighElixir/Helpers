@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace HighElixir.StateMachine.Extension
+namespace HighElixir.StateMachines.Extension
 {
     public static class AutoEventScope
     {

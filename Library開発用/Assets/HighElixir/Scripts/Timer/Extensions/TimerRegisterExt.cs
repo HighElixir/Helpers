@@ -9,6 +9,7 @@ namespace HighElixir.Timers
         /// <summary>
         /// カウントダウンタイマーの登録
         /// </summary>
+        /// <returns><see cref="TimerEventRegistry"/>をもとにしたイベントIDを通知するオブザーバブル</returns>
         public static IObservable<int> CountDownRegister(this Timer t, float duration, out TimerTicket ticket, string name = "", bool isTick = false, bool initZero = false, bool andStart = false)
         {
             lock (t._lock)
@@ -36,6 +37,7 @@ namespace HighElixir.Timers
         /// <summary>
         /// カウントアップタイマーの登録
         /// </summary>
+        /// <returns><see cref="TimerEventRegistry"/>をもとにしたイベントIDを通知するオブザーバブル</returns>
         public static IObservable<int> CountUpRegister(this Timer t, float initializeTime, out TimerTicket ticket, string name = "", bool isTick = false, bool andStart = false)
         {
             lock (t._lock)
@@ -53,6 +55,7 @@ namespace HighElixir.Timers
         /// <summary>
         /// 決まった時間ごとにコールバックを呼ぶパルス式タイマーの登録。
         /// </summary>
+        /// <returns><see cref="TimerEventRegistry"/>をもとにしたイベントIDを通知するオブザーバブル</returns>
         public static IObservable<int> PulseRegister(this Timer t, float initializeTime, float pulseInterval, out TimerTicket ticket, string name = "", bool isTick = false, bool andStart = false)
         {
             lock (t._lock)
@@ -77,6 +80,7 @@ namespace HighElixir.Timers
         /// <summary>
         /// アップダウンタイマーの登録
         /// </summary>
+        /// <returns><see cref="TimerEventRegistry"/>をもとにしたイベントIDを通知するオブザーバブル</returns>
         public static IObservable<int> UpDownRegister(this Timer t, float duration, out TimerTicket ticket, string name = "", bool reversing = false, bool isTick = false, bool initZero = false, bool andStart = false)
         {
             lock (t._lock)

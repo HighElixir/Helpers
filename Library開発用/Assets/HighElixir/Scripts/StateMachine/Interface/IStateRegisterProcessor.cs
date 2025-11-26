@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace HighElixir.StateMachine
+namespace HighElixir.StateMachines
 {
     /// <summary>
     /// ステート登録時の加工ロジックを提供するインターフェース

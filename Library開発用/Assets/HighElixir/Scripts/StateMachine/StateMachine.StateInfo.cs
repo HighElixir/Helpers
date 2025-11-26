@@ -2,7 +2,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace HighElixir.StateMachine
+namespace HighElixir.StateMachines
 {
     public sealed partial class StateMachine<TCont, TEvt, TState>
     {
@@ -14,7 +14,7 @@ namespace HighElixir.StateMachine
             /// <summary>遷移イベントマップ</summary>
             internal Dictionary<TEvt, TState> _transitionMap = new();
             internal ReactiveProperty<EventState> _onTrans = new();
-            private ActionAsObservable<StateInfo> _onCompletion = new();
+            private readonly ActionAsObservable<StateInfo> _onCompletion = new();
             internal IDisposable _obs;
 
             public TState ID { get; internal set; }
@@ -72,9 +72,9 @@ namespace HighElixir.StateMachine
             public override string ToString()
             {
                 if (Parent != null)
-                    return $"{Parent.ToString()}.{ID.ToString()}";
+                    return $"{Parent}.{ID}";
                 else
-                    return $"{ID.ToString()}";
+                    return $"{ID}";
             }
 
             public IDisposable Subscribe(IObserver<EventState> observer)

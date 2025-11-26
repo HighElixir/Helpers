@@ -95,6 +95,7 @@ namespace HighElixir.Timers
         /// T: ITimer を生成して登録する（Factory 経由）。
         /// ReactiveTimerEvent を返すのでイベント購読もここで可能。
         /// </summary>
+        /// <returns><see cref="TimerEventRegistry"/>をもとにしたイベントIDを通知するオブザーバブル</returns>
         public IObservable<int> Register<T>(string name, float initTime, out TimerTicket ticket, float arg = 1, bool andStart = false)
             where T : ITimer
         {

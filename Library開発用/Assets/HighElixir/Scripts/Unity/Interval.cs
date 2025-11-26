@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using UnityEngine;
 
-namespace HighElixir.Unity.Extensions
+namespace HighElixir.Unity
 {
     public static class Interval
     {

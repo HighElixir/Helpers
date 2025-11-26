@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace HighElixir.StateMachine
+namespace HighElixir.StateMachines
 {
     /// <summary>
     /// ステートマシンのエラーハンドリングを差し替えるためのインターフェース

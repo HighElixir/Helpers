@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace HighElixir.StateMachine
+namespace HighElixir.StateMachines
 {
     public sealed partial class StateMachine<TCont, TEvt, TState>
     {

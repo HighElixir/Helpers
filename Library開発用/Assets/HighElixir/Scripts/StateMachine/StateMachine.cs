@@ -1,22 +1,22 @@
 ﻿using HighElixir.Implements;
 using HighElixir.Implements.Observables;
 using HighElixir.Loggings;
-using HighElixir.StateMachine.Extension;
-using HighElixir.StateMachine.Internal;
-using HighElixir.StateMachine.Thead;
+using HighElixir.StateMachines.Extension;
+using HighElixir.StateMachines.Internal;
+using HighElixir.StateMachines.Thead;
 using System;
 using System.Collections.Generic;
-using System.Runtime.ExceptionServices;
+using System.Threading;
 using System.Threading.Tasks;
 
-namespace HighElixir.StateMachine
+namespace HighElixir.StateMachines
 {
     /// <summary>
     /// ステートマシンの本体クラス。
     /// 任意のコンテキスト・イベント・ステート型を扱う汎用ステートマシン。
     /// ネストされたサブホスト構造にも対応し、イベント駆動で状態遷移を制御する。
     /// </summary>
-    public sealed partial class StateMachine<TCont, TEvt, TState> : IStateMachine<TCont>, IDisposable
+    public sealed partial class StateMachine<TCont, TEvt, TState> : IStateMachine<TCont>
     {
         #region Fields
         private IStateMachine<TCont> _parent;
@@ -26,11 +26,11 @@ namespace HighElixir.StateMachine
         private TState _initial;
 
         // 外部依存コンポーネント
-        private IEventQueue<TCont, TEvt, TState> _queue;
-        private TransitionExecutor<TCont, TEvt, TState> _executor;
+        private readonly IEventQueue<TCont, TEvt, TState> _queue;
+        private readonly TransitionExecutor<TCont, TEvt, TState> _executor;
         private readonly Dictionary<TState, StateInfo> _states = new();
         private ILogger _logger;
-        private RequiredLoggerLevel _logLevel = RequiredLoggerLevel.Error | RequiredLoggerLevel.Fatal;
+        private LogLevel _logLevel = LogLevel.Error | LogLevel.Fatal;
 
         // 通知用プロパティ
         private readonly ReactiveProperty<TransitionResult> _onTransition = new();
@@ -39,8 +39,8 @@ namespace HighElixir.StateMachine
         // 現在状態管理
         private (TState id, StateInfo info) _current;
         private bool _disposed;
-        private bool _enableOverriding;
-        private bool _enableSelfTransition;
+        private readonly bool _enableOverriding;
+        private readonly bool _enableSelfTransition;
         #endregion
 
         #region Delegates / Hooks
@@ -49,19 +49,28 @@ namespace HighElixir.StateMachine
 
         /// <summary> ステート登録時の外部プロセッサ。外部フック用。 </summary>
         public IStateRegisterProcessor<TCont, TEvt, TState> RegisterProcessor { get; set; }
+
+        public CancellationTokenSource TransitionTokenSource { get; private set; } = new();
         #endregion
 
         #region Properties
         public IStateMachine<TCont> Parent { get => _parent; internal set => _parent = value; }
         public TCont Context => _cont;
         public (TState id, StateInfo info) Current { get => _current; internal set => _current = value; }
-        public ILogger Logger { get => _logger; internal set => _logger = value; }
+        public ILogger Logger { get => _logger; set => _logger = value; }
+        public LogLevel RequiredLoggerLevel
+        {
+            get => _logLevel;
+            set => _logLevel = value;
+        }
         public bool Awaked { get; internal set; }
         public bool IsRunning { get; internal set; }
         public bool EnableSelfTransition => _enableSelfTransition;
         public bool Disposed => _disposed;
         public IObservable<TransitionResult> OnTransition => _onTransition;
         public IObservable<StateInfo> OnCompletion => _onCompletion;
+
+        uint ILoggable.RequiredLoggerLevel { get => (uint)RequiredLoggerLevel; set => RequiredLoggerLevel = (LogLevel)Enum.ToObject(typeof(LogLevel), value); }
         #endregion
 
         #region Constructors
@@ -83,19 +92,19 @@ namespace HighElixir.StateMachine
         /// <summary>
         /// StateMachineOption から構築するオーバーロード。
         /// - EnableOverriding
-        /// - Logger/LogLevel
+        /// - Logger/RequiredLoggerLevel
         /// - Queue/QueueMode
         /// - EnableSelfTransition  
         /// などのオプションを反映する。
         /// </summary>
-        public StateMachine(StateMachineOption<TCont, TEvt, TState> option)
+        public StateMachine(TCont context, StateMachineOption<TCont, TEvt, TState> option)
         {
             if (option == null) throw new ArgumentNullException(nameof(option));
-            _cont = option.Cont;
+            _cont = context;
             _queue = option.Queue ?? new DefaultEventQueue<TCont, TEvt, TState>(this, option.QueueMode);
             _executor = new(this);
             _logger = option.Logger;
-            _logLevel = option.LogLevel;
+            _logLevel = option.RequiredLoggerLevel;
             _enableOverriding = option.EnableOverriding;
             _enableSelfTransition = option.EnableSelfTransition;
         }
@@ -106,7 +115,7 @@ namespace HighElixir.StateMachine
         /// ステートマシンを初期化して起動する。
         /// 指定された初期ステートが未登録なら例外を投げる。
         /// </summary>
-        public async Task Awake(TState initialState)
+        public async Task Awake(TState initialState, CancellationToken token = default)
         {
             if (!_states.ContainsKey(initialState))
                 throw new ArgumentNullException($"[StateMachine]初期ステート {initialState} が存在しません");
@@ -114,18 +123,19 @@ namespace HighElixir.StateMachine
             _initial = initialState;
             Awaked = true;
 
-            // 未バインド検知（デバッグ支援）
+            // 未バインド検知
             if (_logger != null)
             {
                 foreach (var state in _states.Values)
                 {
                     if (!state.Binded)
-                        Log(RequiredLoggerLevel.Warning, $"{state.ID} does not bind.");
+                        this.Log(LogLevel.Fatal, $"{state.ID} does not bind.");
                 }
             }
 
             Reset();
-            await Start();
+            await Start(token);
+            this.Log(LogLevel.MachineLifeCycle, $"[{Context?.ToString()}] StateMachine Awaked with {_states.Count} states.");
         }
 
         /// <summary>
@@ -136,22 +146,24 @@ namespace HighElixir.StateMachine
         {
             IsRunning = false;
             if (initialize) Reset();
+            this.Log(LogLevel.MachineLifeCycle, $"[{Context?.ToString()}] StateMachine Paused at {_current.id}");
         }
 
         /// <summary> 一時停止中のマシンを再開する。 </summary>
-        public async Task Resume() => await Start();
+        public async Task Resume(CancellationToken token = default) => await Start(token);
 
         /// <summary>
         /// 起動処理。初期ステートをアクティブにして開始する。
         /// </summary>
-        private async Task Start()
+        private async Task Start(CancellationToken token = default)
         {
             if (!_states.ContainsKey(_initial)) return;
             try
             {
-                await StateExecuter.StateEnter(_current.info);
+                await StateExecuter.StateEnter(_current.info, token == default ? Take() : token);
                 _current.info.SubHost?.OnParentEnter();
                 IsRunning = true;
+                this.Log(LogLevel.MachineLifeCycle, $"[{Context?.ToString()}] StateMachine Started at {_initial}");
             }
             catch (Exception ex)
             {
@@ -166,13 +178,14 @@ namespace HighElixir.StateMachine
         {
             if (_states.TryGetValue(_initial, out var state))
                 _current = (_initial, state);
+            this.Log(LogLevel.MachineLifeCycle, $"[{Context?.ToString()}] StateMachine Reset to {_initial}");
         }
 
         /// <summary>
         /// ステートマシンの定期更新処理。
         /// イベントキュー処理や状態更新を実行。
         /// </summary>
-        public async Task Update(float deltaTime = 0f)
+        public async Task Update(float deltaTime = 0f, CancellationToken token = default)
         {
             if (_disposed || !Awaked || !IsRunning) return;
             var s = _current.info;
@@ -183,7 +196,7 @@ namespace HighElixir.StateMachine
 
             if (s.State is StateAsync<TCont> asyncState)
             {
-                await asyncState.UpdateAsync();
+                await asyncState.UpdateAsync(token == default ? Take() : token);
             }
             else
             {
@@ -198,7 +211,7 @@ namespace HighElixir.StateMachine
         /// イベントを即時送信して遷移を試みる。
         /// サブホスト設定に応じて優先転送を行う。
         /// </summary>
-        public async Task<bool> Send(TEvt evt)
+        public async Task<bool> Send(TEvt evt, CancellationToken token = default)
         {
             if (_disposed || !Awaked) return false;
             var s = Current.info;
@@ -208,7 +221,7 @@ namespace HighElixir.StateMachine
                 if (s.SubHost != null && s.SubHost.ForwardFirst && await s.SubHost.TrySend(evt))
                     return true;
 
-                if (!await _executor.TryTransition(evt))
+                if (!await _executor.TryTransition(evt, token == default ? Take() : token))
                 {
                     if (s.SubHost != null && !s.SubHost.ForwardFirst)
                         return await s.SubHost.TrySend(evt);
@@ -250,13 +263,17 @@ namespace HighElixir.StateMachine
             if (_states.ContainsKey(id))
             {
                 if (_states[id].Binded && !_enableOverriding)
-                    throw new InvalidOperationException($"[StateMachine]このIDは既に登録されています: {id}");
+                    this.Log(LogLevel.OverrideWarning, $"[StateMachine]このIDは既に登録されています: {id?.ToString()}");
                 else
+                {
                     _states[id]._state = state;
+                    this.Log(LogLevel.Register, $"[{Context?.ToString()}] ステート上書き登録：{id?.ToString()}");
+                }
             }
             else
             {
                 _states[id] = new() { _state = state, Parent = this, ID = id };
+                this.Log(LogLevel.Register, $"[{Context?.ToString()}] ステート新規登録：{id?.ToString()}");
             }
 
             // 完了通知を購読
@@ -264,18 +281,23 @@ namespace HighElixir.StateMachine
             {
                 var d = _states[id].ObserveAction().Subscribe(x => _onCompletion.Value = x);
                 _states[id]._obs.Join(d);
+                this.Log(LogLevel.INFO, $"[{Context?.ToString()}] ステート完了通知購読登録：{id?.ToString()}");
             }
 
             try
             {
-                RegisterProcessor?.OnRegisterState(id, _states[id]);
+                if (RegisterProcessor != null)
+                {
+                    RegisterProcessor.OnRegisterState(id, _states[id]);
+                    this.Log(LogLevel.Register, $"[{Context?.ToString()}] ステート登録プロセッサ実行：{id?.ToString()}");
+                }
             }
             catch (Exception ex)
             {
                 OnError(ex);
             }
 
-            Log(RequiredLoggerLevel.Info, $"[{Context?.ToString()}] ステート登録：{id?.ToString()}");
+            this.Log(LogLevel.Register, $"[{Context?.ToString()}] ステート登録：{id?.ToString()}");
             return _states[id];
         }
 
@@ -301,7 +323,7 @@ namespace HighElixir.StateMachine
                 state = CreateInfo(fromState);
 
             state.RegisterTransition(evt, toState);
-            Log(RequiredLoggerLevel.Info, $"Registered : {fromState} = \"{evt}\" => {toState}");
+            this.Log(LogLevel.Register, $"Registered : {fromState} = \"{evt}\" => {toState}");
 
             if (onTransition != null)
             {
@@ -388,36 +410,21 @@ namespace HighElixir.StateMachine
             }
             else
             {
-                ExceptionDispatchInfo.Capture(ex).Throw();
+                this.Throw(LogLevel.Error, ex);
             }
         }
         #endregion
 
-        #region Dispose Management
-        public bool IsDisposed => _disposed;
+        #region Async Helpers
 
-        /// <summary> 破棄処理。内部リソースを解放。 </summary>
-        public void Dispose() => Dispose(true);
+        public CancellationToken Take() => TransitionTokenSource.Token;
 
-        private void Dispose(bool disposing)
+        public void Cancel()
         {
-            if (_disposed) return;
-
-            if (disposing)
-            {
-                foreach (var item in _states.Values)
-                    item.Dispose();
-
-                _cont = default;
-                _executor.AnyTransition.Clear();
-                _states.Clear();
-                _onTransition.Dispose();
-                _disposed = true;
-                _parent = null;
-            }
+            TransitionTokenSource.Cancel();
+            TransitionTokenSource = new CancellationTokenSource();
         }
 
-        ~StateMachine() => Dispose(false);
         #endregion
 
         /// <summary>
@@ -428,15 +435,16 @@ namespace HighElixir.StateMachine
         {
             if (_disposed) return string.Empty;
             if (_parent != null)
-                return $"{_parent.ToString()}.[{nameof(TState)}Machine]";
+                return $"{_parent}.[{nameof(TState)}Machine]";
             else
                 return $"[{nameof(TState)}Machine]";
         }
 
-        #region Internal Helpers
         /// <summary> 指定ステートの情報を取得。存在しない場合は false を返す。 </summary>
         public bool TryGetStateInfo(TState state, out StateInfo info)
             => _states.TryGetValue(state, out info);
+
+        #region Internal Helpers
 
         /// <summary> ステート情報を取得し、存在しなければ新規作成する。 </summary>
         internal StateInfo GetOrCreate(TState state)
@@ -456,42 +464,13 @@ namespace HighElixir.StateMachine
         /// <summary> ステート情報を新規作成し、辞書に登録。 </summary>
         internal StateInfo CreateInfo(TState state)
         {
-            var info = new StateInfo();
-            info.ID = state;
-            info.Parent = this;
+            StateInfo info = new()
+            {
+                ID = state,
+                Parent = this
+            };
             _states.Add(state, info);
             return info;
-        }
-
-        // TODO : internalなLogHelperに分離
-        /// <summary> ログ出力可否を判定。 </summary>
-        private bool IsLogEnabled(RequiredLoggerLevel level) => (_logLevel & level) != 0;
-
-        /// <summary> 指定レベルでログを出力。 </summary>
-        internal void Log(RequiredLoggerLevel level, string message)
-        {
-            if (_logger == null || !IsLogEnabled(level)) return;
-            switch (level)
-            {
-                case RequiredLoggerLevel.Info: _logger.Info(message); break;
-                case RequiredLoggerLevel.Warning: _logger.Warn(message); break;
-                case RequiredLoggerLevel.Error: _logger.Error(message); break;
-                case RequiredLoggerLevel.Fatal: _logger.Error(message); break;
-                default: break;
-            }
-        }
-
-        // TODO : internalなLogHelperに分離
-        /// <summary> 例外をログ出力。 </summary>
-        private void Log(RequiredLoggerLevel level, Exception ex)
-        {
-            if (_logger == null || !IsLogEnabled(level)) return;
-            switch (level)
-            {
-                case RequiredLoggerLevel.Error: _logger.Error(ex); break;
-                case RequiredLoggerLevel.Fatal: _logger.Error(ex); break;
-                default: _logger.Error(ex); break;
-            }
         }
         #endregion
     }

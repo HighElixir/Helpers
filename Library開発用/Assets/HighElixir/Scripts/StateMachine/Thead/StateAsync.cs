@@ -1,21 +1,22 @@
-﻿using System.Threading.Tasks;
+﻿using System.Threading;
+using System.Threading.Tasks;
 
-namespace HighElixir.StateMachine.Thead
+namespace HighElixir.StateMachines.Thead
 {
     /// <summary>
     /// 非同期ステートの基底クラス
     /// </summary>
     public abstract class StateAsync<TCont> : State<TCont>
     {
-        public virtual Task EnterAsync()
+        public virtual Task EnterAsync(CancellationToken token)
         {
             return Task.CompletedTask;
         }
-        public virtual Task UpdateAsync()
+        public virtual Task UpdateAsync(CancellationToken token)
         {
             return Task.CompletedTask;
         }
-        public virtual Task ExitAsync()
+        public virtual Task ExitAsync(CancellationToken token)
         {
             return Task.CompletedTask;
         }

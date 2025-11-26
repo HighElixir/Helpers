@@ -1,4 +1,4 @@
-﻿namespace HighElixir.StateMachine.Extension
+﻿namespace HighElixir.StateMachines.Extension
 {
     public static class TagExt
     {

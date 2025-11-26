@@ -1,4 +1,4 @@
-﻿namespace HighElixir.StateMachine
+﻿namespace HighElixir.StateMachines
 {
     public enum EventState
     {

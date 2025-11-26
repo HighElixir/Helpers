@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace HighElixir.StateMachine
+namespace HighElixir.StateMachines
 {
     /// <summary>
     /// これを実装すると、StateInfoはStateの責務が完了したことをFMSに通知できるようになる。

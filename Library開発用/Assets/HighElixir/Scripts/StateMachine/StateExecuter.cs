@@ -1,16 +1,17 @@
-﻿using HighElixir.StateMachine.Thead;
+﻿using HighElixir.StateMachines.Thead;
+using System.Threading;
 using System.Threading.Tasks;
 
-namespace HighElixir.StateMachine
+namespace HighElixir.StateMachines
 {
     public static class StateExecuter
     {
-        public static async Task StateExit<TCont, TEvt, TState>(StateMachine<TCont, TEvt, TState>.StateInfo info)
+        public static async Task StateExit<TCont, TEvt, TState>(StateMachine<TCont, TEvt, TState>.StateInfo info, CancellationToken token = default)
         {
             if (info.State is StateAsync<TCont> fromAsync)
             {
                 info._onTrans.Value = EventState.Exiting;
-                await fromAsync.ExitAsync();
+                await fromAsync.ExitAsync(token);
             }
             else
             {
@@ -18,12 +19,12 @@ namespace HighElixir.StateMachine
                 info.State.Exit();
             }
         }
-        public static async Task StateEnter<TCont, TEvt, TState>(StateMachine<TCont, TEvt, TState>.StateInfo info)
+        public static async Task StateEnter<TCont, TEvt, TState>(StateMachine<TCont, TEvt, TState>.StateInfo info, CancellationToken token = default)
         {
             if (info.State is StateAsync<TCont> fromAsync)
             {
                 info._onTrans.Value = EventState.Exiting;
-                await fromAsync.EnterAsync();
+                await fromAsync.EnterAsync(token);
             }
             else
             {
