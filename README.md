@@ -19,8 +19,8 @@ Unity開発を効率化するためのヘルパーライブラリ集です。ス
 | パッケージ | ダウンロード |
 |-----------|------------|
 | **HighElixir.Helpers (全機能)** | [HighElixir.unitypackage](https://github.com/HighElixir/Helpers/raw/main/HighElixir.unitypackage) |
-| **StateMachine のみ** | [highelixir.statemachine.unitypackage](https://github.com/HighElixir/Helpers/raw/main/Library開発用/Assets/HighElixir/Packages/highelixir.statemachine.unitypackage) |
-| **Timers のみ** | [highelixir.timers.unitypackage](https://github.com/HighElixir/Helpers/raw/main/Library開発用/Assets/HighElixir/Packages/highelixir.timers.unitypackage) |
+| **StateMachine のみ** | [highelixir.statemachine.unitypackage](https://github.com/HighElixir/Helpers/raw/main/Library%E9%96%8B%E7%99%BA%E7%94%A8/Assets/HighElixir/Packages/highelixir.statemachine.unitypackage) |
+| **Timers のみ** | [highelixir.timers.unitypackage](https://github.com/HighElixir/Helpers/raw/main/Library%E9%96%8B%E7%99%BA%E7%94%A8/Assets/HighElixir/Packages/highelixir.timers.unitypackage) |
 
 ### インポート方法
 
