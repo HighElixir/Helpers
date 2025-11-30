@@ -713,7 +713,7 @@ MonoBehaviour:
   m_ContentType: 2
   m_InputType: 0
   m_AsteriskChar: 42
-  m_KeyboardType: 4
+  m_KeyboardType: 2
   m_LineType: 0
   m_HideMobileInput: 0
   m_HideSoftKeyboard: 0
@@ -817,15 +817,8 @@ MonoBehaviour:
   _minus: {fileID: 2831655881940878072}
   _plus: {fileID: 681096405099857971}
   _text: {fileID: 8311350401887429641}
-  _soundOption: 0
-  _clickSound: {fileID: 0}
-  _disallowedSound: {fileID: 0}
-  _minusSound: {fileID: 0}
-  _plusSound: {fileID: 0}
-  _defaultAmount: 0
-  _oneClickChange: 1
-  min: -2147483648
-  max: 2147483647
-  _onChanged:
+  _onValueChanged:
     m_PersistentCalls:
       m_Calls: []
+  _defaultAmount: 0
+  _step: 1

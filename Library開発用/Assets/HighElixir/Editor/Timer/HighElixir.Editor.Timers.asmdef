@@ -1,10 +1,9 @@
 {
-    "name": "HighElixir.Editor",
-    "rootNamespace": "HighElixir.Editors",
+    "name": "HighElixir.Editor.Timers",
+    "rootNamespace": "HighElixir.Editor.Timers",
     "references": [
         "GUID:3151164fd1f9d9a459a35d877bf09d55",
-        "GUID:cc4602d02a189d2408a9366f01305ae8",
-        "GUID:db8429dbc367a7347aa9ce1a84ddeb6f"
+        "GUID:a3585fec8ad674c4e811e8ee138d424b"
     ],
     "includePlatforms": [
         "Editor"

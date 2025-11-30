@@ -19,7 +19,7 @@ namespace HighElixir.Unity.StateMachine
 
         public void ReceiveEvent(int evt)
         {
-            _ = _stateMachine.Send(evt, destroyCancellationToken);
+            _ = _stateMachine.Send(evt, _source.Token);
         }
         public void ReceiveEvent(string evt)
         {
@@ -38,11 +38,12 @@ namespace HighElixir.Unity.StateMachine
         public void AwakeMachine(TCont cont, int state)
         {
             _stateMachine = new StateMachine<TCont, int, int>(cont, _options);
-            _ = _stateMachine.Awake(state, destroyCancellationToken);
+            _ = _stateMachine.Awake(state, _source.Token);
         }
 
         private void Update()
         {
+            if (_stateMachine.IsDisposed || _stateMachine.IsRunning) return;
             if (!Interval.Check(_rate)) return;
             if (_needToRegenerate)
             {
@@ -50,10 +51,13 @@ namespace HighElixir.Unity.StateMachine
                 _source = new CancellationTokenSource();
                 _needToRegenerate = false;
             }
+            _ = _stateMachine.Update(Time.deltaTime, _source.Token);
         }
 
         private void OnDestroy()
         {
+            _source.Cancel();
+            _source.Dispose();
             _stateMachine?.Dispose();
         }
     }

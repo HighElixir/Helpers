@@ -1,19 +1,16 @@
 {
-    "name": "HighElixir.Editor",
-    "rootNamespace": "HighElixir.Editors",
+    "name": "HighElixir.Unity.Pools",
+    "rootNamespace": "",
     "references": [
-        "GUID:3151164fd1f9d9a459a35d877bf09d55",
-        "GUID:cc4602d02a189d2408a9366f01305ae8",
+        "GUID:df976389477d6b04596ec8d501056e4c",
         "GUID:db8429dbc367a7347aa9ce1a84ddeb6f"
     ],
-    "includePlatforms": [
-        "Editor"
-    ],
+    "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
     "overrideReferences": false,
     "precompiledReferences": [],
-    "autoReferenced": false,
+    "autoReferenced": true,
     "defineConstraints": [],
     "versionDefines": [],
     "noEngineReferences": false

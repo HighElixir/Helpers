@@ -1,9 +1,8 @@
 {
-    "name": "HighElixir.Unity",
-    "rootNamespace": "HighElixir.Unity",
+    "name": "HighElixir.Headgeables",
+    "rootNamespace": "HighElixir.Headgeables",
     "references": [
-        "GUID:f38f8d6027bc17b4cb260304d9470735",
-        "GUID:a3585fec8ad674c4e811e8ee138d424b"
+        "GUID:f38f8d6027bc17b4cb260304d9470735"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

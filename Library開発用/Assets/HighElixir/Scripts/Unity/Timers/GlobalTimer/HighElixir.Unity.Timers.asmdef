@@ -1,10 +1,8 @@
 {
-    "name": "HighElixir.Unity.UniTask",
+    "name": "HighElixir.Unity.Timers",
     "rootNamespace": "",
     "references": [
-        "GUID:a3585fec8ad674c4e811e8ee138d424b",
-        "GUID:f51ebe6a0ceec4240a699833d6309b23",
-        "GUID:f38f8d6027bc17b4cb260304d9470735"
+        "GUID:a3585fec8ad674c4e811e8ee138d424b"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

@@ -13,8 +13,7 @@ namespace HighElixir.Timers
         internal static TimerTicket Take(string name)
         {
             var k = Guid.NewGuid().ToString("N");
-            if (string.IsNullOrEmpty(name))
-                name = Unnamed;
+            name = name ?? Unnamed;
             return new TimerTicket(k, name);
         }
 
@@ -25,9 +24,9 @@ namespace HighElixir.Timers
 
         public bool Equals(TimerTicket other)
         {
-            return this.Key == other.Key;
+            return string.Equals(this.Key, other.Key, StringComparison.OrdinalIgnoreCase);
         }
-        public override int GetHashCode() => Key?.GetHashCode() ?? 0;
+        public override int GetHashCode() => Key?.GetHashCode(StringComparison.OrdinalIgnoreCase) ?? 0;
 
         internal TimerTicket(string key, string name)
         {

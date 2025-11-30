@@ -1,239 +1,72 @@
 ﻿using HighElixir.Implements.Observables;
 using HighElixir.StateMachines;
 using HighElixir.StateMachines.Extension;
+using HighElixir.Unity.Animations;
 using System;
-using System.Collections.Generic;
 using UnityEngine;
 
-namespace HighElixir.Unity.StateMachine.Extension
+namespace HighElixir.Unity.StateMachine.AnimatorExtension
 {
-    /// <summary>
-    /// ステートマシンとUnity Animatorの連携拡張
-    /// <br/>StateMachineの遷移イベントをAnimator Triggerに変換する
-    /// </summary>
-    public static partial class AnimationExt
+    public static class AnimationPunblisher
     {
-        /// <summary>
-        /// 遷移イベントを購読し、Animator Triggerを発火する
-        /// </summary>
-        public static AnimationBinding Subscribe<TCont, TEvt, TState>(
-            this IObservable<StateMachine<TCont, TEvt, TState>.TransitionResult> ontrans,
-            TCont cont,
-            string animTrigger)
-            where TCont : Component
-
+        #region === Subscriber ===
+        public static IDisposable SetTriggerOnStateTrans<TCont,TEvt,TState>(this StateMachine<TCont, TEvt, TState> machine, Animator animator, string animTrigger)
         {
-            if (ontrans == null) throw new ArgumentNullException(nameof(ontrans));
-            if (cont == null) throw new ArgumentNullException(nameof(cont));
-            if (string.IsNullOrEmpty(animTrigger)) throw new ArgumentException("animTrigger must be non-empty", nameof(animTrigger));
-
-            var wr = cont.GetWrapper(animTrigger);
-            wr.disposable = ontrans.Subscribe(_ =>
+            return machine.OnTransition.Subscribe(_ =>
             {
-                if (wr == null || !wr.IsValid) return;
-                // keep ResetTrigger to preserve existing behavior
-                wr.animator.ResetTrigger(wr.name);
-                wr.animator.SetTrigger(wr.name);
+               animator.SetTrigger(animTrigger);
             });
-            return wr;
         }
-
-        #region ▼ 単体登録 ▼
-
-        public static AnimationBinding RegisterTransition<TCont, TEvt, TState>(this StateMachine<TCont, TEvt, TState>.StateInfo info, TEvt evt, TState toState, string animTrigger, Func<StateMachine<TCont, TEvt, TState>.TransitionResult, bool> predicate = null)
-            where TCont : Component
+        public static IDisposable ResetTriggerOnStateTrans<TCont, TEvt, TState>(this StateMachine<TCont, TEvt, TState> machine, Animator animator, string animTrigger)
         {
-            info.RegisterTransition(evt, toState);
-            return info.Parent.OnTransWhere(info.ID, evt, toState)
-                               .Where(predicate)
-                               .Subscribe(info.Parent.Context, animTrigger);
+            return machine.OnTransition.Subscribe(_ =>
+            {
+                animator.ResetTrigger(animTrigger);
+            });
         }
+        public static IDisposable SetFloatOnStateTrans<TCont,TEvt,TState>(this StateMachine<TCont, TEvt, TState> machine, Animator animator, string animTrigger, float param)
+        {
+            return machine.OnTransition.Subscribe(_ =>
+            {
+               animator.SetFloat(animTrigger, param);
+            });
+        }
+        public static IDisposable SetIntegerOnStateTrans<TCont,TEvt,TState>(this StateMachine<TCont, TEvt, TState> machine, Animator animator, string animTrigger, int param)
+        {
+            return machine.OnTransition.Subscribe(_ =>
+            {
+               animator.SetInteger(animTrigger, param);
+            });
+        }
+        public static IDisposable SetBoolOnStateTrans<TCont,TEvt,TState>(this StateMachine<TCont, TEvt, TState> machine, Animator animator, string animTrigger, bool param)
+        {
+            return machine.OnTransition.Subscribe(_ =>
+            {
+               animator.SetBool(animTrigger, param);
+            });
+        }
+        #endregion
 
-        /// <summary>
-        /// 通常の遷移にAnimator Trigger発火を紐づける（条件付き）
-        /// </summary>
-        public static AnimationBinding RegisterTransition<TCont, TEvt, TState>(
-            this StateMachine<TCont, TEvt, TState> stateMachine,
+        #region === BindTransition ===
+        public static IDisposable RegisterTransition<TCont, TEvt, TState>(
+            this StateMachine<TCont, TEvt, TState> machine,
             TState fromState,
             TEvt evt,
             TState toState,
-            string animTrigger,
-            Func<StateMachine<TCont, TEvt, TState>.TransitionResult, bool> predicate)
-            where TCont : Component
-
-        {
-            stateMachine.RegisterTransition(fromState, evt, toState);
-            return stateMachine.OnTransWhere(fromState, evt, toState)
-                               .Where(predicate)
-                               .Subscribe(stateMachine.Context, animTrigger);
-        }
-
-        /// <summary>
-        /// 通常の遷移にAnimator Trigger発火を紐づける（条件なし）
-        /// </summary>
-        public static AnimationBinding RegisterTransition<TCont, TEvt, TState>(
-            this StateMachine<TCont, TEvt, TState> stateMachine,
-            TState fromState,
-            TEvt evt,
-            TState toState,
+            Animator animator,
             string animTrigger)
-            where TCont : Component
-
-            => stateMachine.RegisterTransition(fromState, evt, toState, animTrigger, null);
-
-
-        /// <summary>
-        /// 任意遷移にAnimator Trigger発火を紐づける（条件付き）
-        /// </summary>
-        public static AnimationBinding RegisterAnyTransition<TCont, TEvt, TState>(
-            this StateMachine<TCont, TEvt, TState> stateMachine,
-            TEvt evt,
-            TState toState,
-            string animTrigger,
-            Func<StateMachine<TCont, TEvt, TState>.TransitionResult, bool> predicate)
-            where TCont : Component
-
         {
-            stateMachine.RegisterAnyTransition(evt, toState);
-            return stateMachine.OnTransWhere(evt, toState)
-                               .Where(predicate)
-                               .Subscribe(stateMachine.Context, animTrigger);
-        }
-
-        /// <summary>
-        /// 任意遷移にAnimator Trigger発火を紐づける（条件なし）
-        /// </summary>
-        public static AnimationBinding RegisterAnyTransition<TCont, TEvt, TState>(
-            this StateMachine<TCont, TEvt, TState> stateMachine,
-            TEvt evt,
-            TState toState,
-            string animTrigger)
-            where TCont : Component
-
-            => stateMachine.RegisterAnyTransition(evt, toState, animTrigger, null);
-
-        #endregion
-
-
-        #region ▼ 一括登録 ▼
-
-        /// <summary>
-        /// 任意遷移のTrigger発火を複数登録する（条件付き）
-        /// </summary>
-        public static Dictionary<(TEvt evt, TState toState), AnimationBinding>
-            RegisterAnyTransitions<TCont, TEvt, TState>(
-                this StateMachine<TCont, TEvt, TState> stateMachine,
-                params (TEvt evt, TState toState, string animTrigger,
-                        Func<StateMachine<TCont, TEvt, TState>.TransitionResult, bool> predicate)[] transes)
-            where TCont : Component
-
-        {
-            var res = new Dictionary<(TEvt evt, TState toState), AnimationBinding>();
-            foreach (var trans in transes)
-                res.Add((trans.evt, trans.toState),
-                    stateMachine.RegisterAnyTransition(trans.evt, trans.toState, trans.animTrigger, trans.predicate));
-            return res;
-        }
-
-        /// <summary>
-        /// 任意遷移のTrigger発火を複数登録する（条件なし）
-        /// </summary>
-        public static Dictionary<(TEvt evt, TState toState), AnimationBinding>
-            RegisterAnyTransitions<TCont, TEvt, TState>(
-                this StateMachine<TCont, TEvt, TState> stateMachine,
-                params (TEvt evt, TState toState, string animTrigger)[] transes)
-            where TCont : Component
-
-        {
-            var res = new Dictionary<(TEvt evt, TState toState), AnimationBinding>();
-            foreach (var trans in transes)
-                res.Add((trans.evt, trans.toState),
-                    stateMachine.RegisterAnyTransition(trans.evt, trans.toState, trans.animTrigger));
-            return res;
-        }
-
-        /// <summary>
-        /// 通常遷移のTrigger発火を複数登録する（条件付き）
-        /// </summary>
-        public static Dictionary<(TState fromState, TEvt evt, TState toState), AnimationBinding>
-            RegisterTransitions<TCont, TEvt, TState>(
-                this StateMachine<TCont, TEvt, TState> stateMachine,
-                TState fromState,
-                params (TEvt evt, TState toState, string animTrigger,
-                        Func<StateMachine<TCont, TEvt, TState>.TransitionResult, bool> predicate)[] transes)
-            where TCont : Component
-
-        {
-            var res = new Dictionary<(TState fromState, TEvt evt, TState toState), AnimationBinding>();
-            foreach (var trans in transes)
-                res.Add((fromState, trans.evt, trans.toState),
-                    stateMachine.RegisterTransition(fromState, trans.evt, trans.toState, trans.animTrigger, trans.predicate));
-            return res;
-        }
-
-        /// <summary>
-        /// 通常遷移のTrigger発火を複数登録する（条件なし）
-        /// </summary>
-        public static Dictionary<(TState fromState, TEvt evt, TState toState), AnimationBinding>
-            RegisterTransitions<TCont, TEvt, TState>(
-                this StateMachine<TCont, TEvt, TState> stateMachine,
-                TState fromState,
-                params (TEvt evt, TState toState, string animTrigger)[] transes)
-            where TCont : Component
-
-        {
-            var res = new Dictionary<(TState fromState, TEvt evt, TState toState), AnimationBinding>();
-            foreach (var trans in transes)
-                res.Add((fromState, trans.evt, trans.toState),
-                    stateMachine.RegisterTransition(fromState, trans.evt, trans.toState, trans.animTrigger));
-            return res;
-        }
-
-        #endregion
-
-
-        /// <summary>
-        /// すべてのアニメ購読を破棄する
-        /// </summary>
-        public static void DisposeAll(this IEnumerable<AnimationBinding> wrappers)
-        {
-            foreach (var w in wrappers)
-                w?.Dispose();
-        }
-
-        #region private
-
-        private static AnimationBinding GetWrapper<TCont>(this TCont cont, string trigger)
-            where TCont : Component
-        {
-            if (!cont.TryGetComponent<Animator>(out var anim) &&
-                (anim = cont.GetComponentInChildren<Animator>()) == null)
-                throw new MissingComponentException($"[StateMachine_Anim]{cont.name}にAnimatorがアタッチされていません");
-
-            return new AnimationBinding()
-            {
-                name = trigger,
-                animator = anim
-            };
-        }
-
-        private static bool HasTrigger(this Animator animator, int hash)
-        {
-            var pars = animator.parameters;
-            for (int i = 0; i < pars.Length; i++)
-            {
-                var p = pars[i];
-                if (p.type == AnimatorControllerParameterType.Trigger && p.nameHash == hash) return true;
-            }
-            return false;
-        }
-
-        private static bool Check(AnimationBinding wrapper)
-        {
-            if (wrapper == null) return false;
-            if (wrapper.Disposed) return false;
-            if (wrapper.animator == null) return false;
-            return wrapper.animator.HasTrigger(wrapper.hash);
+            machine.RegisterTransition(fromState, evt, toState);
+            return machine.OnTransWhere(fromState, evt, toState)
+                .Subscribe(_ =>
+                {
+                    if (AnimationValidator.IsValid(animator, AnimatorControllerParameterType.Trigger, animTrigger))
+                    {
+                        animator.SetTrigger(animTrigger);
+                    }
+                    else
+                        Debug.LogWarning($"[StateMachine_Anim]AnimatorにTriggerパラメータ'{animTrigger}'が存在しないか、型が異なります");
+                });
         }
 
         #endregion
