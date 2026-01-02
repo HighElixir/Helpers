@@ -17,11 +17,10 @@ namespace HighElixir.Unity.Addressable
                 throw new ArgumentNullException(nameof(filePath), "Addressables key cannot be null or empty.");
 
             var handle = Addressables.LoadAssetAsync<TextAsset>(filePath);
-            TextAsset textAsset = null;
             try
             {
                 progress?.Report(0.5f);
-                textAsset = await handle.Task;
+                TextAsset textAsset = await handle.Task;
 
                 if (textAsset == null)
                 {
@@ -34,8 +33,7 @@ namespace HighElixir.Unity.Addressable
                 }
                 string jsonText = textAsset.text.Replace("\uFEFF", "").Trim(); // BOM除去＆整形
                 //Debug.Log(jsonText);
-                var result = JsonConvert.DeserializeObject<T>(jsonText);
-                if (result == null)
+                var result = JsonConvert.DeserializeObject<T>(jsonText) ??
                     throw new JsonSerializationException($"Deserialization of {typeof(T).Name} returned null. Address: {filePath}");
 
                 return result;

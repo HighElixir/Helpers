@@ -1,0 +1,18 @@
+{
+    "name": "HighElixir.Editor.Timers",
+    "rootNamespace": "HighElixir.Editor.Timers",
+    "references": [
+        "GUID:c1b925184030f7849833a2114c90a085"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

@@ -4,7 +4,7 @@ using HighElixir.Implements.Observables;
 using HighElixir.StateMachines;
 using HighElixir.StateMachines.Thead.Blocks;
 using HighElixir.Timers;
-using HighElixir.Unity.Timers;
+using HighElixir.Timers.Unity;
 using System;
 using UnityEngine;
 

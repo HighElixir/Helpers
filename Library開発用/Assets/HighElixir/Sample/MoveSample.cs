@@ -1,4 +1,6 @@
 ﻿using HighElixir.StateMachines;
+using HighElixir.StateMachines.Extension;
+using HighElixir.Unity;
 using HighElixir.Unity.Loggings;
 using System;
 using UniRx;
@@ -12,8 +14,8 @@ namespace HighElixir.Sample
     {
         public enum Event
         {
-            Moved = 0,
-            Stop = 1,
+            ToMove = 0,
+            ToIdle = 1,
         }
 
         public enum State
@@ -21,34 +23,48 @@ namespace HighElixir.Sample
             Idle,
             Moved,
         }
+
+        [SerializeField] private string _walk;
         private StateMachine<GameObject, Event, State> _fms;
-        private ReactiveProperty<Vector2> _move = new(Vector2.zero);
+        private Animator _animator;
+        private Rigidbody _rb;
+
+        // InputManage
+        private ReactiveProperty<Vector2> _inputMove = new(Vector2.zero);
 
         private void Awake()
         {
+            _rb = GetComponent<Rigidbody>();
+            _animator = GetComponent<Animator>();
             _fms = new(gameObject, logger: new UnityLogger());
             _fms.RegisterState(State.Idle, new Idle<GameObject>());
-            _fms.RegisterState(State.Moved, new Move(_move, GetComponent<Rigidbody>()));
-            _fms.RegisterTransition(State.Idle, Event.Moved, State.Moved);
-            _fms.RegisterTransition(State.Moved, Event.Stop, State.Idle);
-            _fms.Awake(State.Idle);
+            _fms.RegisterState(State.Moved, new Move(_inputMove, _rb));
+            _fms.RegisterTransition(State.Idle, Event.ToMove, State.Moved);
+            _fms.RegisterTransition(State.Moved, Event.ToIdle, State.Idle);
+            _ = _fms.Awake(State.Idle);
         }
 
         private void Update()
         {
             _fms?.Update(Time.deltaTime);
+            if (Interval.Check(25))
+            {
+                var speed = Mathf.Abs(_rb.linearVelocity.x) + Mathf.Abs(_rb.linearVelocity.z);
+                _animator.SetFloat(_walk, speed);
+                if (_inputMove.Value != Vector2.zero)
+                {
+                    _fms.SendToForget(Event.ToMove);
+                }
+                else
+                {
+                    _fms.SendToForget(Event.ToIdle);
+                }
+            }
         }
         private void OnMove(InputValue inputValue)
         {
-            _move.Value = inputValue.Get<Vector2>();
-            if (_move.Value != Vector2.zero)
-            {
-                _fms.Send(Event.Moved);
-            }
-            else
-            {
-                _fms.Send(Event.Stop);
-            }
+            Debug.Log("OnMove");
+            _inputMove.Value = inputValue.Get<Vector2>();
         }
     }
 
@@ -72,7 +88,7 @@ namespace HighElixir.Sample
             if (_moveDir != Vector2.zero)
             {
                 var convertion = new Vector3(_moveDir.x, 0, _moveDir.y);
-                _rigidbody.AddForce(convertion * 5);
+                _rigidbody.AddForce(convertion * 30);
             }
         }
 
