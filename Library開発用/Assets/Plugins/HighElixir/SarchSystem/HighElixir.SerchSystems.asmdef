@@ -1,0 +1,16 @@
+{
+    "name": "HighElixir.SerchSystems",
+    "rootNamespace": "",
+    "references": [
+        "HighElixir.Core"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
