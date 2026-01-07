@@ -1,5 +1,5 @@
 {
-    "name": "HighElixir.Unity",
+    "name": "HighElixir_Old.Unity",
     "rootNamespace": "HighElixir.Unity",
     "references": [
         "GUID:f38f8d6027bc17b4cb260304d9470735",

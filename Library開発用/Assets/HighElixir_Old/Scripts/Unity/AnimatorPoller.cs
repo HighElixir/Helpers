@@ -1,10 +1,9 @@
 ﻿using HighElixir.Implements;
-using HighElixir.Unity.Animations;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace HighElixir.Unity.AnimatorExtension
+namespace HighElixir.Core.UnityExtensions.AnimatorExtensions
 {
     /// <summary>
     /// Animatorのパラメータをポーリングで更新するクラス
