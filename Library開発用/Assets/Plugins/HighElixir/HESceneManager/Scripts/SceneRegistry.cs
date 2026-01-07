@@ -94,6 +94,28 @@ namespace HighElixir.HESceneManager
             sceneData.RegistryKey = "";
         }
 
+        internal bool TryMarge(Scene scene)
+        {
+            if (TryGetScene(scene, out var existing))
+            {
+                if (!existing.Scene.Equals(scene))
+                    existing.Scene = scene;
+                return true;
+            }
+            return false;
+        }
+
+        internal bool TryMarge(SceneInstance instance)
+        {
+            if (TryGetScene(instance, out var existing))
+            {
+                if (!existing.Instance.Equals(instance))
+                    existing.Instance = instance;
+                return true;
+            }
+            return false;
+        }
+
         /// <summary>
         /// 引数が「CompatID」でも「AddressableName」でも「SceneName」でも取れるようにする。
         /// ただし未登録の場合は新規発行しない（TryGetのみ）

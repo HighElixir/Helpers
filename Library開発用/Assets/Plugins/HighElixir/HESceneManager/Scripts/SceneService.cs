@@ -1,38 +1,55 @@
 ﻿using Cysharp.Threading.Tasks;
 using HighElixir.HESceneManager.Utils;
+using System;
 using System.Linq;
+using System.Threading;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
 
 namespace HighElixir.HESceneManager
 {
-    public sealed class HESceneService
+    public sealed class SceneService
     {
         private readonly SceneRegistry _registry = new();
         public SceneRegistry Registry => _registry;
 
-        public HESceneService()
+        public SceneService()
         {
-            _registry.SetCurrentScene(SceneServiceExtension.GetActiveSceneAndPacking());
+            this.GetOrRegisterActiveSceneData();
         }
 
-        public async UniTask<SceneData> LoadSceneAsync(string addressableName)
+        public async UniTask<SceneData> LoadSceneAsync(string addressableName, CancellationToken token = default)
         {
             // ここは「検索で新規ID発行しない」TryGetScene実装になってる想定
             if (_registry.TryGetScene(addressableName, out var sceneData))
                 return sceneData;
 
-            var handle = Addressables.LoadSceneAsync(
-                addressableName,
-                UnityEngine.SceneManagement.LoadSceneMode.Additive);
+            try
+            {
+                var handle = Addressables.LoadSceneAsync(
+                    addressableName,
+                    UnityEngine.SceneManagement.LoadSceneMode.Additive)
+                    .ToUniTask()
+                    .AttachExternalCancellation(token);
 
-            var instance = await handle;
+                var instance = await handle;
 
-            // ★重要：addressableName を渡す（Linkが成立してCompatIDが統一される）
-            var newSceneData = new SceneData(instance, isPersisted: false, addressableName: addressableName);
+                // ★重要：addressableName を渡す（Linkが成立してCompatIDが統一される）
+                var newSceneData = new SceneData(instance, isPersisted: false, addressableName: addressableName);
 
-            _registry.RegisterScene(newSceneData);
-            return newSceneData;
+                _registry.RegisterScene(newSceneData);
+                return newSceneData;
+            }
+            catch (OperationCanceledException)
+            {
+                Debug.LogWarning($"Scene loading for '{addressableName}' was canceled.");
+                return SceneData.InvalidData();
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"Failed to load scene '{addressableName}': {ex.Message}");
+                return SceneData.InvalidData();
+            }
         }
 
         public async UniTask ActivateAsync(SceneData sceneData)

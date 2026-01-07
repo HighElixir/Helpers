@@ -125,5 +125,15 @@ namespace HighElixir.HESceneManager
                    EqualityComparer<SceneInstance>.Default.Equals(Instance, other.Instance) &&
                    IsPersisted == other.IsPersisted;
         }
+
+        public static bool operator ==(SceneData left, SceneData right)
+        {
+            return EqualityComparer<SceneData>.Default.Equals(left, right);
+        }
+
+        public static bool operator !=(SceneData left, SceneData right)
+        {
+            return !(left == right);
+        }
     }
 }

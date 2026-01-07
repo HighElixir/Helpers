@@ -1,4 +1,5 @@
-﻿using UnityEngine.SceneManagement;
+﻿using HighElixir.HESceneManager.DirectionSequence;
+using UnityEngine.SceneManagement;
 
 namespace HighElixir.HESceneManager.Utils
 {
@@ -8,7 +9,7 @@ namespace HighElixir.HESceneManager.Utils
         /// 現在アクティブなシーンを SceneData として取得する。
         /// 可能なら Registry 内の既存 SceneData を返し、無ければ生成して登録する。
         /// </summary>
-        public static SceneData GetOrRegisterActiveSceneData(this HESceneService hE)
+        public static SceneData GetOrRegisterActiveSceneData(this SceneService hE)
         {
             var active = SceneManager.GetActiveScene();
 
@@ -31,14 +32,24 @@ namespace HighElixir.HESceneManager.Utils
             return new SceneData(active, false);
         }
 
-        public static SceneData[] GetAllLoadedScenes()
+        public static SceneData[] GetAllLoadedScenes(SceneService service)
         {
+            var r = service.Registry;
             int sceneCount = SceneManager.sceneCount;
             SceneData[] scenes = new SceneData[sceneCount];
             for (int i = 0; i < sceneCount; i++)
             {
                 var scene = SceneManager.GetSceneAt(i);
-                scenes[i] = new SceneData(scene, false);
+                if (r.TryGetScene(scene.name, out var data))
+                {
+                    data.Scene = scene; // シーンオブジェクトを最新化
+                }
+                else
+                {
+                    data = new SceneData(scene, isPersisted: false);
+                    r.RegisterScene(data);
+                }
+                scenes[i] = data;
             }
             return scenes;
         }
@@ -47,7 +58,7 @@ namespace HighElixir.HESceneManager.Utils
         /// シーンを非同期に破棄するためのDisposerを作成します
         /// </summary>
         public static SceneScopeHandle CreateAsyncDisposable(
-            this HESceneService hE,
+            this SceneService hE,
             SceneData sceneData,
             SceneScopeHandle.HandleOnDispose handleOnDispose = SceneScopeHandle.HandleOnDispose.Unload)
         {
@@ -59,7 +70,7 @@ namespace HighElixir.HESceneManager.Utils
         }
 
         public static SceneScopeHandle CreateAsyncDisposableFromActive(
-            this HESceneService hE,
+            this SceneService hE,
             SceneScopeHandle.HandleOnDispose handleOnDispose = SceneScopeHandle.HandleOnDispose.Unload)
         {
             // ★重要：新規生成ではなく、Registryの既存を優先
@@ -67,10 +78,10 @@ namespace HighElixir.HESceneManager.Utils
             return new SceneScopeHandle(activeSceneData, hE, handleOnDispose);
         }
 
-        public static void RegisterLoadedScenes(this HESceneService hE)
+        public static void RegisterLoadedScenes(this SceneService hE)
         {
             // まとめて登録。RegisterSceneがCompatIDで吸収する前提。
-            hE.Registry.RegisterScenes(GetAllLoadedScenes());
+            hE.Registry.RegisterScenes(GetAllLoadedScenes(hE));
         }
 
         /// <summary>
@@ -78,7 +89,7 @@ namespace HighElixir.HESceneManager.Utils
         /// ここで Link してから登録すると、以後の検索が強くなる。
         /// </summary>
         public static void LinkAndRegisterLoadedScenes(
-            this HESceneService hE,
+            this SceneService hE,
             params (string addressableName, string sceneName)[] links)
         {
             if (links != null)
@@ -91,6 +102,11 @@ namespace HighElixir.HESceneManager.Utils
             }
 
             hE.RegisterLoadedScenes();
+        }
+
+        public static Sequence CreateSequence(this SceneService service)
+        {
+            return new(service);
         }
     }
 }

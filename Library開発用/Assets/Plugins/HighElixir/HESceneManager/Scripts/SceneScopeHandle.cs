@@ -11,12 +11,12 @@ namespace HighElixir.HESceneManager
             SetActive
         }
         private readonly SceneData _data;
-        private readonly HESceneService _service;
+        private readonly SceneService _service;
         private readonly HandleOnDispose _handle;
         private bool _disposed = false;
 
         public bool Canceled { get; private set; } = false;
-        public SceneScopeHandle(SceneData data, HESceneService service, HandleOnDispose handle = HandleOnDispose.Unload)
+        public SceneScopeHandle(SceneData data, SceneService service, HandleOnDispose handle = HandleOnDispose.Unload)
         {
             _data = data;
             _service = service;
