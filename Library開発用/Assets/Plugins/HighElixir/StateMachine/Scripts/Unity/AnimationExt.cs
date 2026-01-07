@@ -1,7 +1,7 @@
 ﻿using HighElixir.Implements.Observables;
 using HighElixir.StateMachines;
 using HighElixir.StateMachines.Extension;
-using HighElixir.Unity.Animations;
+using HighElixir.Core.UnityExtensions.AnimatorExtensions;
 using System;
 using UnityEngine;
 

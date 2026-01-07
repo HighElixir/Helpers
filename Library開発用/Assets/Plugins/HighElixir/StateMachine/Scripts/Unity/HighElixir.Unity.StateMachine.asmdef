@@ -3,8 +3,7 @@
     "rootNamespace": "HighElixir.Unity.StateMachine",
     "references": [
         "GUID:f38f8d6027bc17b4cb260304d9470735",
-        "GUID:730a75ce3820e6243b07b35774416725",
-        "GUID:db8429dbc367a7347aa9ce1a84ddeb6f"
+        "GUID:730a75ce3820e6243b07b35774416725"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
