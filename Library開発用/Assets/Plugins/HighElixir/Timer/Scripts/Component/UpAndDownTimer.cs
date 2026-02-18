@@ -16,7 +16,8 @@ namespace HighElixir.Timers
         public UpAndDownTimer(TimerConfig config) : base(config)
         {
             if (config.InitializeTime <= 0f) SendError(new ArgumentOutOfRangeException(nameof(config.InitializeTime)));
-            IsReversing = config.ArgumentTime == 0;
+            // 1: 上昇, 0: 下降
+            IsReversing = config.ArgumentTime > 0f;
             InitialTime = config.InitializeTime;
         }
 

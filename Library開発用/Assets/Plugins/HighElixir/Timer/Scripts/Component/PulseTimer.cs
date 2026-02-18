@@ -48,7 +48,15 @@ namespace HighElixir.Timers
             : base(config)
         {
             InitialTime = config.InitializeTime;
-            PulseDuration = config.ArgumentTime;
+            if (config.ArgumentTime <= 0f)
+            {
+                SendError(new ArgumentOutOfRangeException(nameof(config.ArgumentTime)));
+                PulseDuration = 1f;
+            }
+            else
+            {
+                PulseDuration = config.ArgumentTime;
+            }
         }
 
         public override void Update(float dt)

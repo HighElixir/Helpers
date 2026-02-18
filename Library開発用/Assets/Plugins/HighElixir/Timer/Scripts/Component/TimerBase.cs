@@ -105,6 +105,13 @@ namespace HighElixir.Timers
                 try { _event.Value = TimerEventRegistry.TakeEvt(TimeEventType.Initialize); }
                 catch (Exception ex) { SendError(ex); }
         }
+
+        internal void NotifyRemoved()
+        {
+            lock (_lock)
+                try { _event.Value = TimerEventRegistry.TakeEvt(TimeEventType.OnRemoved); }
+                catch (Exception ex) { SendError(ex); }
+        }
         #endregion
 
         public void Dispose()

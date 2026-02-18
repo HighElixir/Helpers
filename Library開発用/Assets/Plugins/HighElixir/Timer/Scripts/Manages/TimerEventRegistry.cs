@@ -65,5 +65,27 @@ namespace HighElixir.Timers
             }
             return false;
         }
+
+        public static bool TryGetType(int id, out TimeEventType type)
+        {
+            foreach (var pair in _permanentEvent)
+            {
+                if (pair.Value == id)
+                {
+                    type = pair.Key;
+                    return true;
+                }
+            }
+
+            type = TimeEventType.None;
+            return false;
+        }
+
+        public static TimeEventType ToType(int id)
+        {
+            return TryGetType(id, out var type)
+                ? type
+                : TimeEventType.None;
+        }
     }
 }

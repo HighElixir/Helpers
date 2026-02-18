@@ -271,7 +271,7 @@ namespace HighElixir.Editors.Timers
                             cmp = string.Compare(a.Ticket.Name, b.Ticket.Name, StringComparison.Ordinal);
                             break;
                         case SortMode.CountType:
-                            cmp = a.Ticket.GetType().Name.CompareTo(b.Timer.GetType().Name);
+                            cmp = string.Compare(a.Timer.GetType().Name, b.Timer.GetType().Name, StringComparison.Ordinal);
                             break;
                         case SortMode.Current:
                             cmp = a.Timer.Current.CompareTo(b.Timer.Current);
@@ -334,7 +334,7 @@ namespace HighElixir.Editors.Timers
                     var tp = timer.Timer.GetType();
 
                     // Normalize できない（INormalizeable でない）ものはカウントアップ扱い
-                    bool isUp = tp is not INormalizeable;
+                    bool isUp = timer.Timer is not INormalizeable;
 
                     string tmp = tp is ITick ? " (Tick)" : "";
                     string postfix1 = isUp ? tmp : "";

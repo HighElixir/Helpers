@@ -112,10 +112,14 @@ namespace HighElixir.Samples
             // ===============================
             _disposable.JoinTo(
                 GlobalTimer.Update
-                .PulseRegister(0f, _pulse, out var ticket, "パルス", andStart: true)
+                .PulseRegister(0f, _pulse, out var ticket, new TimerRegisterOptions
+                {
+                    Name = "パルス",
+                    AndStart = true
+                })
                 // イベントストリームを購読 → Finished のみ受け取る
                 .Skip()
-                .Where(id => TimerEventRegistry.Equals(id, TimeEventType.Finished))
+                .Where(evt => evt == TimeEventType.Finished)
                 .Subscribe(_ =>
                 {
                     audio.Play();
@@ -127,8 +131,11 @@ namespace HighElixir.Samples
             // Up&Down タイマー
             // ===============================
             _disposable.JoinTo(
-                GlobalTimer.Update.UpDownRegister(_upAndDown, out ticket, "アップ＆ダウン")
-                .Where(id => TimerEventRegistry.Equals(id, TimeEventType.Finished))
+                GlobalTimer.Update.UpDownRegister(_upAndDown, out ticket, new TimerRegisterOptions
+                {
+                    Name = "アップ＆ダウン"
+                })
+                .Where(evt => evt == TimeEventType.Finished)
                 .Subscribe(_ =>
                 {
                     Debug.Log("アップ＆ダウン finished");
@@ -139,15 +146,21 @@ namespace HighElixir.Samples
             // ===============================
             // CountDown2（await 用）
             // ===============================
-            GlobalTimer.Update.CountDownRegister(_countDown2, out ticket, nameof(_countDown2));
+            GlobalTimer.Update.CountDownRegister(_countDown2, out ticket, new TimerRegisterOptions
+            {
+                Name = nameof(_countDown2)
+            });
             _ticketHolder[nameof(_countDown2)] = ticket;
 
             // ===============================
             // CountDown3（FixedUpdate）
             // ===============================
             _disposable.JoinTo(
-                GlobalTimer.FixedUpdate.CountDownRegister(_countDown3, out ticket, nameof(_countDown3))
-                .Where(id => TimerEventRegistry.Equals(id, TimeEventType.Finished))
+                GlobalTimer.FixedUpdate.CountDownRegister(_countDown3, out ticket, new TimerRegisterOptions
+                {
+                    Name = nameof(_countDown3)
+                })
+                .Where(evt => evt == TimeEventType.Finished)
                 .Subscribe(_ =>
                 {
                     Debug.Log("CountDown 3 finished");
@@ -173,8 +186,11 @@ namespace HighElixir.Samples
             // CountDown4（CountDown2 の後に開始）
             // ===============================
             _disposable.JoinTo(
-                GlobalTimer.Update.CountDownRegister(_countDown4, out ticket, nameof(_countDown4))
-                .Where(id => TimerEventRegistry.Equals(id, TimeEventType.Finished))
+                GlobalTimer.Update.CountDownRegister(_countDown4, out ticket, new TimerRegisterOptions
+                {
+                    Name = nameof(_countDown4)
+                })
+                .Where(evt => evt == TimeEventType.Finished)
                 .Subscribe(_ =>
                 {
                     Debug.Log("CountDown 4 finished");
@@ -187,15 +203,22 @@ namespace HighElixir.Samples
             // ===============================
             // CountUpInterval
             // ===============================
-            GlobalTimer.FixedUpdate.CountDownRegister(_countUpInterval, out ticket, nameof(_countUpInterval), true);
+            GlobalTimer.FixedUpdate.CountDownRegister(_countUpInterval, out ticket, new TimerRegisterOptions
+            {
+                Name = nameof(_countUpInterval),
+                IsTick = true
+            });
             _ticketHolder[nameof(_countUpInterval)] = ticket;
 
             // ===============================
             // CountUp(0) → リセット時に CountUpInterval 開始
             // ===============================
             _disposable.JoinTo(
-                GlobalTimer.FixedUpdate.CountUpRegister(0f, out ticket, _id)
-                .Where(id => TimerEventRegistry.Equals(id, TimeEventType.Finished))
+                GlobalTimer.FixedUpdate.CountUpRegister(0f, out ticket, new TimerRegisterOptions
+                {
+                    Name = _id
+                })
+                .Where(evt => evt == TimeEventType.Finished)
                 .Subscribe(_ =>
                 {
                     Debug.Log("CountUp reseted");

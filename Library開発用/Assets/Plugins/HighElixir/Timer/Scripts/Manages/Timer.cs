@@ -5,7 +5,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.ExceptionServices;
-using UnityEditor;
 
 // Timers.cs
 namespace HighElixir.Timers
@@ -25,6 +24,7 @@ namespace HighElixir.Timers
 
         // TimerTicket → ITimer の実体
         private readonly Dictionary<TimerTicket, ITimer> _timers = new();
+        private readonly Dictionary<TimerTicket, TimerMeta> _meta = new();
         private readonly List<(TimerTicket ticket, ITimer timer)> _timersCache = new();
         private bool _isDirty = true;
 
@@ -38,6 +38,12 @@ namespace HighElixir.Timers
         // 遅延操作キュー（Start/Stop/Reset を後で処理）
         private readonly CommandQueue _commandQueue;
 
+        // 単一時間ストリーム（複数周期イベントの基準）
+        private readonly Dictionary<StreamTicket, StreamEntry> _streamSchedules = new();
+        private readonly List<StreamDispatch> _streamDispatchBuffer = new();
+        private float _streamNow = 0f;
+        private const float StreamEpsilon = 0.0001f;
+
         public string ParentName
         {
             get => _parentName;
@@ -48,6 +54,11 @@ namespace HighElixir.Timers
 
         // CommandQueue がいくつ溜まっているか（監視用）
         public int CommandCount => _commandQueue.CommandCount;
+
+        /// <summary>
+        /// 単一時間ストリームの現在時刻（秒）。
+        /// </summary>
+        public float StreamNow => _streamNow;
 
         public Timer(string parentName = null)
         {
@@ -81,6 +92,105 @@ namespace HighElixir.Timers
             => _commandQueue.Enqueue(ticket, operation);
         #endregion
 
+        #region TimeStream
+        /// <summary>
+        /// Stream に周期コールバックを登録する。
+        /// </summary>
+        public StreamTicket StreamEvery(float intervalSeconds, Action callback, string name = null, StreamScheduleOptions options = default)
+        {
+            if (callback == null)
+            {
+                SendError(new ArgumentNullException(nameof(callback)));
+                return default;
+            }
+
+            if (intervalSeconds <= 0f)
+            {
+                SendError(new ArgumentOutOfRangeException(nameof(intervalSeconds), "intervalSeconds は 0 より大きい必要があります。"));
+                return default;
+            }
+
+            lock (_lock)
+            {
+                var ticket = StreamTicket.Take(name);
+                var start = options.RunImmediately ? _streamNow : _streamNow + intervalSeconds;
+                _streamSchedules[ticket] = new StreamEntry(intervalSeconds, start, callback, options);
+                return ticket;
+            }
+        }
+
+        public bool StreamContains(StreamTicket ticket)
+        {
+            lock (_lock)
+            {
+                return _streamSchedules.ContainsKey(ticket);
+            }
+        }
+
+        public bool StreamUnregister(StreamTicket ticket)
+        {
+            lock (_lock)
+            {
+                return _streamSchedules.Remove(ticket);
+            }
+        }
+
+        public bool StreamPause(StreamTicket ticket, bool pause = true)
+        {
+            lock (_lock)
+            {
+                if (_streamSchedules.TryGetValue(ticket, out var entry))
+                {
+                    entry.Paused = pause;
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        public bool StreamResume(StreamTicket ticket) => StreamPause(ticket, false);
+
+        public int StreamScheduleCount
+        {
+            get
+            {
+                lock (_lock)
+                {
+                    return _streamSchedules.Count;
+                }
+            }
+        }
+
+        public void StreamClear()
+        {
+            lock (_lock)
+            {
+                _streamSchedules.Clear();
+                _streamDispatchBuffer.Clear();
+            }
+        }
+
+        /// <summary>
+        /// Stream時刻をリセットし、必要に応じて各スケジュールを再基準化する。
+        /// </summary>
+        public void StreamReset(float now = 0f, bool restartSchedules = true)
+        {
+            lock (_lock)
+            {
+                _streamNow = Math.Max(0f, now);
+                if (!restartSchedules)
+                    return;
+
+                foreach (var entry in _streamSchedules.Values)
+                {
+                    entry.NextDue = entry.Options.RunImmediately
+                        ? _streamNow
+                        : _streamNow + entry.IntervalSeconds;
+                }
+            }
+        }
+        #endregion
+
         #region 登録処理
         /// <summary>
         /// 生成済み ITimer を登録。
@@ -89,6 +199,56 @@ namespace HighElixir.Timers
         {
             _isDirty = true;
             _timers[ticket] = timer;
+        }
+
+        internal void SetMetadata(TimerTicket ticket, in TimerMeta meta)
+        {
+            lock (_lock)
+            {
+                if (!meta.HasAny)
+                {
+                    _meta.Remove(ticket);
+                    return;
+                }
+
+                _meta[ticket] = meta;
+            }
+        }
+
+        internal bool TryGetMetadata(TimerTicket ticket, out TimerMeta meta)
+        {
+            lock (_lock)
+            {
+                return _meta.TryGetValue(ticket, out meta);
+            }
+        }
+
+        internal TimerTicket[] GetTicketsByGroup(string group)
+        {
+            if (string.IsNullOrWhiteSpace(group))
+                return Array.Empty<TimerTicket>();
+
+            lock (_lock)
+            {
+                return _meta
+                    .Where(x => string.Equals(x.Value.Group, group, StringComparison.Ordinal))
+                    .Select(x => x.Key)
+                    .ToArray();
+            }
+        }
+
+        internal TimerTicket[] GetTicketsByTag(string tag)
+        {
+            if (string.IsNullOrWhiteSpace(tag))
+                return Array.Empty<TimerTicket>();
+
+            lock (_lock)
+            {
+                return _meta
+                    .Where(x => string.Equals(x.Value.Tag, tag, StringComparison.Ordinal))
+                    .Select(x => x.Key)
+                    .ToArray();
+            }
         }
 
         /// <summary>
@@ -125,8 +285,11 @@ namespace HighElixir.Timers
                 if (_timers.TryGetValue(ticket, out var timer))
                 {
                     _isDirty = true;
+                    if (timer is TimerBase timerBase)
+                        timerBase.NotifyRemoved();
                     timer.Dispose();      // イベント破棄
                     _timers.Remove(ticket);
+                    _meta.Remove(ticket);
                     return true;
                 }
                 return false;
@@ -240,6 +403,8 @@ namespace HighElixir.Timers
 
             if (deltaTime <= 0f) return;
 
+            UpdateStream(deltaTime);
+
             // 安全のためコピー
             KeyValuePair<TimerTicket, ITimer>[] local;
             lock (_lock)
@@ -263,6 +428,112 @@ namespace HighElixir.Timers
             }
         }
 
+        private void UpdateStream(float deltaTime)
+        {
+            StreamDispatch[] dispatches;
+            lock (_lock)
+            {
+                _streamNow += deltaTime;
+                _streamDispatchBuffer.Clear();
+
+                foreach (var pair in _streamSchedules)
+                {
+                    var entry = pair.Value;
+                    if (entry.Paused || entry.Callback == null) continue;
+                    if (_streamNow + StreamEpsilon < entry.NextDue) continue;
+
+                    int dispatchCount = CalculateDispatchCount(entry, _streamNow);
+                    if (dispatchCount <= 0) continue;
+
+                    _streamDispatchBuffer.Add(new StreamDispatch(entry.Callback, dispatchCount));
+                }
+
+                dispatches = _streamDispatchBuffer.ToArray();
+            }
+
+            for (int i = 0; i < dispatches.Length; i++)
+            {
+                var dispatch = dispatches[i];
+                for (int c = 0; c < dispatch.Count; c++)
+                {
+                    try
+                    {
+                        dispatch.Callback.Invoke();
+                    }
+                    catch (Exception ex)
+                    {
+                        SendError(ex);
+                        break;
+                    }
+                }
+            }
+        }
+
+        private static int CalculateDispatchCount(StreamEntry entry, float now)
+        {
+            if (now + StreamEpsilon < entry.NextDue)
+                return 0;
+
+            switch (entry.Options.CatchUpMode)
+            {
+                case StreamCatchUpMode.CatchUpAll:
+                    return AdvanceAndCountCatchUpAll(entry, now);
+
+                case StreamCatchUpMode.CatchUpMax:
+                    return AdvanceAndCountCatchUpMax(entry, now);
+
+                case StreamCatchUpMode.Skip:
+                default:
+                    AdvanceToAfterNow(entry, now);
+                    return 1;
+            }
+        }
+
+        private static int AdvanceAndCountCatchUpAll(StreamEntry entry, float now)
+        {
+            int count = 0;
+            while (now + StreamEpsilon >= entry.NextDue)
+            {
+                entry.NextDue += entry.IntervalSeconds;
+                count++;
+
+                // 異常設定への安全弁
+                if (count >= 10000) break;
+            }
+            return count;
+        }
+
+        private static int AdvanceAndCountCatchUpMax(StreamEntry entry, float now)
+        {
+            int max = entry.Options.ResolveMaxCatchUp();
+            int count = 0;
+
+            while (count < max && now + StreamEpsilon >= entry.NextDue)
+            {
+                entry.NextDue += entry.IntervalSeconds;
+                count++;
+            }
+
+            // 上限超過分は捨てて、次の周期へ進める
+            if (now + StreamEpsilon >= entry.NextDue)
+                AdvanceToAfterNow(entry, now);
+
+            return count;
+        }
+
+        private static void AdvanceToAfterNow(StreamEntry entry, float now)
+        {
+            if (entry.IntervalSeconds <= 0f)
+                return;
+
+            if (now + StreamEpsilon < entry.NextDue)
+                return;
+
+            var delta = now - entry.NextDue;
+            int step = (int)Math.Floor(delta / entry.IntervalSeconds) + 1;
+            entry.NextDue += step * entry.IntervalSeconds;
+        }
+
         #region タイマーへの操作
         /// <summary>
         /// TimerEvent（Start/Stop/Reset/Finished など）を購読
@@ -272,7 +543,18 @@ namespace HighElixir.Timers
             if (TryGetTimer(ticket, out var t))
                 return t.ReactiveTimerEvent;
 
-            return null;
+            return Empty<int>.Instance;
+        }
+
+        /// <summary>
+        /// TimerEvent（Start/Stop/Reset/Finished など）を型付きで購読
+        /// </summary>
+        public IObservable<TimeEventType> GetTimerEvtType(TimerTicket ticket)
+        {
+            if (TryGetTimer(ticket, out var t))
+                return t.ReactiveTimerEvent.Convert(TimerEventRegistry.ToType);
+
+            return Empty<TimeEventType>.Instance;
         }
 
         /// <summary>
@@ -322,14 +604,51 @@ namespace HighElixir.Timers
 
                 // 各タイマー破棄
                 foreach (var t in _timers.Values)
+                {
+                    if (t is TimerBase timerBase)
+                        timerBase.NotifyRemoved();
                     t.Dispose();
+                }
                 _timers.Clear();
+                _meta.Clear();
+                _streamSchedules.Clear();
+                _streamDispatchBuffer.Clear();
 
                 _commandQueue.Dispose();
                 _onError = null;
 #if UNITY_EDITOR
                 TimerManager.Unregister(this);
 #endif
+            }
+        }
+
+        private sealed class StreamEntry
+        {
+            public readonly float IntervalSeconds;
+            public float NextDue;
+            public readonly Action Callback;
+            public readonly StreamScheduleOptions Options;
+            public bool Paused;
+
+            public StreamEntry(float intervalSeconds, float nextDue, Action callback, StreamScheduleOptions options)
+            {
+                IntervalSeconds = intervalSeconds;
+                NextDue = nextDue;
+                Callback = callback;
+                Options = options;
+                Paused = false;
+            }
+        }
+
+        private readonly struct StreamDispatch
+        {
+            public readonly Action Callback;
+            public readonly int Count;
+
+            public StreamDispatch(Action callback, int count)
+            {
+                Callback = callback;
+                Count = count;
             }
         }
         #endregion

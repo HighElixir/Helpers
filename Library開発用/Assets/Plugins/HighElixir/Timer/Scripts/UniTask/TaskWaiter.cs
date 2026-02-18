@@ -1,6 +1,6 @@
 ﻿using Cysharp.Threading.Tasks;
-using HighElixir.Implements.Observables;
 using HighElixir.Timers.Extensions;
+using HighElixir.Implements.Observables;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -13,27 +13,23 @@ namespace HighElixir.Timers.Async
     {
         Completed, // 正常に完了した
         Canceled,  // キャンセルされた
-        Faulted,    // エラーが発生した
+        Faulted,   // エラーが発生した
         TimerAlreadyFinished, // タイマーは既に完了していた
         TimerNotFound // タイマーが見つからなかった (削除済みなど)
     }
+
     /// <summary>
     /// 非同期待機サポート
     /// </summary>
     /// <remarks>
-    /// Initialize / Resetでキャンセルされる
+    /// Initialize / Reset でキャンセルされる
     /// </remarks>
     public static class TaskWaiter
     {
-        // TODO: 通常のTask版も実装する
-        // --- UniTask版 ---
-        // UniTaskを使用する場合は、HighElixir.Timers.asmdefにUniTaskを参照追加し、
-        // Edit/Preferences/Player/Other Settings/Scripting Define Symbols に "INSTALLED_UNITASK" を追加して有効化してください。
-#if INSTALLED_UNITASK
         // チケットごとの待機状態
         private sealed class AwaitState
         {
-            public int Version; // Initialize/Resetで++する
+            public int Version; // Initialize/Reset で++する
             public readonly List<UniTaskCompletionSource<bool>> FinishWaiters = new();
         }
 
@@ -41,22 +37,26 @@ namespace HighElixir.Timers.Async
         private static readonly ConcurrentDictionary<TimerTicket, AwaitState> _awaits = new();
 
         /// <summary>
-        /// タイマーが完了するまで待機する (UniTask.Create 版)
+        /// タイマーが完了するまで待機する
         /// </summary>
         public static UniTask<TimerAsyncResult> WaitUntilFinishedAsync(this HighElixir.Timers.Timer timer, TimerTicket ticket, bool autoStart, bool isLazy = true, CancellationToken ct = default)
         {
-            if (autoStart) timer.Start(ticket);
+            if (autoStart)
+                timer.Start(ticket, isLazy);
+
             return UniTask.Create<TimerAsyncResult>(async () =>
             {
-                // 遅延開始対応（Startされるまで待機）
+                // 遅延開始対応（Start されるまで待機）
                 if (isLazy)
+                {
                     await UniTask.WaitUntil(
-                        () => timer.IsRunning(ticket),
+                        () => timer.IsRunning(ticket) || !timer.Contains(ticket),
                         PlayerLoopTiming.PreUpdate,
                         ct);
+                }
 
                 if (!timer.Contains(ticket))
-                    throw new InvalidOperationException("Timer not found.");
+                    return TimerAsyncResult.TimerNotFound;
 
                 if (timer.IsFinished(ticket))
                     return TimerAsyncResult.TimerAlreadyFinished;
@@ -64,14 +64,14 @@ namespace HighElixir.Timers.Async
                 var st = _awaits.GetOrAdd(ticket, _ => new AwaitState());
 
                 // イベント取得
-                var tevt = timer.GetTimerEvt(ticket);
-                var dispose = tevt.Subscribe(id =>
+                var tevt = timer.GetTimerEvtType(ticket);
+                var dispose = tevt.Subscribe(evt =>
                 {
-                    if (TimerEventRegistry.HasAny(id, TimeEventType.Initialize, TimeEventType.Reset))
+                    if (evt == TimeEventType.Initialize || evt == TimeEventType.Reset)
                         BumpGenerationAndCancelWaiters(ticket);
-                    if (TimerEventRegistry.Equals(id, TimeEventType.Finished))
+                    if (evt == TimeEventType.Finished)
                         NotifyFinished(ticket);
-                    if (TimerEventRegistry.Equals(id, TimeEventType.OnRemoved))
+                    if (evt == TimeEventType.OnRemoved)
                         OnRemoved(ticket);
                 });
 
@@ -87,12 +87,12 @@ namespace HighElixir.Timers.Async
                 {
                     if (ct.IsCancellationRequested)
                     {
-                        // 既にキャンセル済みなら即キャンセル扱い
                         if (tcs.TrySetCanceled(ct))
                         {
                             lock (st.FinishWaiters)
                                 st.FinishWaiters.Remove(tcs);
                         }
+
                         dispose.Dispose();
                         return TimerAsyncResult.Canceled;
                     }
@@ -109,6 +109,7 @@ namespace HighElixir.Timers.Async
                         }
                     });
                 }
+
                 TimerAsyncResult result = TimerAsyncResult.Faulted;
                 try
                 {
@@ -117,7 +118,6 @@ namespace HighElixir.Timers.Async
                 }
                 catch (OperationCanceledException)
                 {
-                    // 想定内：CT/Reset/Restart/Remove 等でキャンセル
 #if DEBUG
                     Debug.Log($"[TimerExt] canceled: {ticket.Name}");
 #endif
@@ -138,6 +138,7 @@ namespace HighElixir.Timers.Async
                     reg.Dispose();
                     dispose.Dispose();
                 }
+
                 return result;
             });
         }
@@ -158,10 +159,12 @@ namespace HighElixir.Timers.Async
             }
         }
 
-        /// <summary>Restart/Reset時は世代更新＆未完了待機者をキャンセル扱いに</summary>
+        /// <summary>Restart/Reset 時は世代更新＆未完了待機者をキャンセル扱いに</summary>
         public static void BumpGenerationAndCancelWaiters(TimerTicket ticket)
         {
+#if DEBUG
             Debug.Log($"[TimerExt] BumpGenerationAndCancelWaiters: {ticket.Name}");
+#endif
             if (TryClearWaiters(ticket, out var waiters, bumpVersion: true))
             {
                 foreach (var tcs in waiters)
@@ -187,7 +190,8 @@ namespace HighElixir.Timers.Async
         private static bool TryClearWaiters(TimerTicket ticket, out List<UniTaskCompletionSource<bool>> waiters, bool bumpVersion = false)
         {
             waiters = null;
-            if (!_awaits.TryGetValue(ticket, out var st)) return false;
+            if (!_awaits.TryGetValue(ticket, out var st))
+                return false;
 
             lock (st.FinishWaiters)
             {
@@ -197,11 +201,11 @@ namespace HighElixir.Timers.Async
                 waiters = new List<UniTaskCompletionSource<bool>>(st.FinishWaiters);
                 st.FinishWaiters.Clear();
 
-                if (bumpVersion) st.Version++;
+                if (bumpVersion)
+                    st.Version++;
             }
             return true;
         }
         #endregion
-#endif
     }
 }

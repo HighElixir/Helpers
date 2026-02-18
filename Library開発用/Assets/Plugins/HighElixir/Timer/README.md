@@ -9,6 +9,7 @@ Unity向けの柔軟なタイマー管理ライブラリです。複数のタイ
 - **4種類のタイマータイプ**: カウントダウン、カウントアップ、パルス、アップダウン
 - **Tick対応**: フレーム単位での更新に対応したTickタイマーバリアント
 - **スレッドセーフ**: ロック機構による安全な並行アクセス
+- **型付きイベント**: `TimeEventType` を直接購読可能
 
 ## インストール
 
@@ -26,10 +27,14 @@ using HighElixir.Timers;
 var timer = new Timer("MyTimerManager");
 
 // 5秒のカウントダウンタイマーを登録
-timer.CountDownRegister(5f, out var ticket, name: "Countdown", andStart: true)
-    .Subscribe(eventId =>
+timer.CountDownRegister(5f, out var ticket, new TimerRegisterOptions
     {
-        if (TimerEventRegistry.Equals(eventId, TimeEventType.Finished))
+        Name = "Countdown",
+        AndStart = true
+    })
+    .Subscribe(evt =>
+    {
+        if (evt == TimeEventType.Finished)
         {
             Debug.Log("カウントダウン完了！");
         }
@@ -42,7 +47,11 @@ timer.CountDownRegister(5f, out var ticket, name: "Countdown", andStart: true)
 
 ```csharp
 // カウントアップタイマーを登録
-timer.CountUpRegister(0f, out var ticket, name: "Elapsed", andStart: true);
+timer.CountUpRegister(0f, out var ticket, new TimerRegisterOptions
+{
+    Name = "Elapsed",
+    AndStart = true
+});
 
 // 後で経過時間を取得
 if (timer.TryGetCurrentTime(ticket, out float current))
@@ -57,10 +66,14 @@ if (timer.TryGetCurrentTime(ticket, out float current))
 
 ```csharp
 // 1秒ごとにイベントを発火するパルスタイマー
-timer.PulseRegister(0f, 1f, out var ticket, name: "Pulse", andStart: true)
-    .Subscribe(eventId =>
+timer.PulseRegister(0f, 1f, out var ticket, new TimerRegisterOptions
     {
-        if (TimerEventRegistry.Equals(eventId, TimeEventType.Finished))
+        Name = "Pulse",
+        AndStart = true
+    })
+    .Subscribe(evt =>
+    {
+        if (evt == TimeEventType.Finished)
         {
             Debug.Log("パルス発火！");
         }
@@ -73,7 +86,12 @@ timer.PulseRegister(0f, 1f, out var ticket, name: "Pulse", andStart: true)
 
 ```csharp
 // 3秒のアップダウンタイマー（上昇方向で開始）
-timer.UpDownRegister(3f, out var ticket, name: "UpDown", reversing: true, andStart: true);
+timer.UpDownRegister(3f, out var ticket, new TimerRegisterOptions
+{
+    Name = "UpDown",
+    Reversing = true,
+    AndStart = true
+});
 
 // 方向を切り替え
 if (timer.TryGetTimer(ticket, out var t) && t is IUpAndDown upDown)
@@ -106,17 +124,21 @@ public class MyBehaviour : MonoBehaviour
 void Start()
 {
     // カウントダウンタイマーを登録して開始
-    _timer.CountDownRegister(10f, out _ticket, name: "GameTimer", andStart: true)
+    _timer.CountDownRegister(10f, out _ticket, new TimerRegisterOptions
+        {
+            Name = "GameTimer",
+            AndStart = true
+        })
         .Subscribe(OnTimerEvent);
 }
 
-private void OnTimerEvent(int eventId)
+private void OnTimerEvent(TimeEventType evt)
 {
-    if (TimerEventRegistry.Equals(eventId, TimeEventType.Finished))
+    if (evt == TimeEventType.Finished)
     {
         Debug.Log("タイマー完了");
     }
-    else if (TimerEventRegistry.Equals(eventId, TimeEventType.Start))
+    else if (evt == TimeEventType.Start)
     {
         Debug.Log("タイマー開始");
     }
@@ -183,10 +205,73 @@ _timer.Reset(_ticket, isLazy: true);
 
 ```csharp
 // Tick版カウントダウン（10フレーム）
-timer.CountDownRegister(10f, out var ticket, name: "TickTimer", isTick: true, andStart: true);
+timer.CountDownRegister(10f, out var ticket, new TimerRegisterOptions
+{
+    Name = "TickTimer",
+    IsTick = true,
+    AndStart = true
+});
 
 // Tick版パルス（5フレームごとにイベント）
-timer.PulseRegister(0f, 5f, out var ticket, name: "TickPulse", isTick: true, andStart: true);
+timer.PulseRegister(0f, 5f, out var ticket, new TimerRegisterOptions
+{
+    Name = "TickPulse",
+    IsTick = true,
+    AndStart = true
+});
+```
+
+## 利便API（Schedule / Handle / Group / Fluent）
+
+```csharp
+using HighElixir.Timers.Unity;
+using HighElixir.Timers.Extensions;
+
+// 1) Schedule API
+var delay = timer.Delay(2f, () => Debug.Log("2秒後に実行"));
+var pulse = timer.Every(1f, () => Debug.Log("毎秒呼ばれる"));
+
+// 2) Handle 返却API
+var h = timer.CreateCountDown(5f, new TimerRegisterOptions
+{
+    Name = "BossTimer",
+    Group = "Battle",
+    Tag = "UI",
+    AndStart = true
+});
+h.Stop();
+h.Start();
+
+// 3) Group 操作API
+timer.StopGroup("Battle");
+timer.StartTag("UI");
+
+// 4) Fluent API
+var fluent = timer.NewCountDown(3f)
+    .Name("FluentCD")
+    .Group("Battle")
+    .Tag("UI")
+    .Tick()
+    .AutoStart()
+    .OnFinished(() => Debug.Log("Fluent finish"))
+    .Build(autoUnregister: true);
+```
+
+## TimeStream（1つの時間ストリームで複数周期を駆動）
+
+```csharp
+// 1つの基準時間 StreamNow に対して、複数周期を登録
+var s05 = timer.StreamEvery(0.5f, () => Debug.Log("0.5 sec"));
+var s10 = timer.StreamEvery(1.0f, () => Debug.Log("1.0 sec"));
+var s30 = timer.StreamEvery(3.0f, () => Debug.Log("3.0 sec"), options: StreamScheduleOptions.CatchUpMax(2));
+
+// 一時停止 / 再開 / 解除
+timer.StreamPause(s10);
+timer.StreamResume(s10);
+timer.StreamUnregister(s30);
+
+// Stream基準時刻のリセット
+timer.StreamReset(0f, restartSchedules: true);
 ```
 
 ## イベント一覧

@@ -10,7 +10,6 @@ namespace HighElixir.Timers.Unity
         internal class Wrapper
         {
             public readonly Lazy<Timer> Timer;
-            internal TimerTicket _stream;
             public bool IsCreated => Timer.IsValueCreated;
             internal Timer Instance => Timer.Value;
             public Wrapper(string name)
@@ -21,9 +20,13 @@ namespace HighElixir.Timers.Unity
 
         internal static readonly Wrapper update = new Wrapper("GlobalTimer");
         internal static readonly Wrapper fixedUpdate = new Wrapper("GlobalFixedTimer");
+        internal static readonly Wrapper lateUpdate = new Wrapper("GlobalLateTimer");
+        internal static readonly Wrapper unscaledUpdate = new Wrapper("GlobalUnscaledTimer");
 
         public static Timer Update => update.Instance;
         public static Timer FixedUpdate => fixedUpdate.Instance;
+        public static Timer LateUpdate => lateUpdate.Instance;
+        public static Timer UnscaledUpdate => unscaledUpdate.Instance;
 
         private static void CreateObj()
         {
