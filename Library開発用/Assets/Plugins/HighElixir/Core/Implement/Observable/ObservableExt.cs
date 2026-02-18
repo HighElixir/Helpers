@@ -21,6 +21,17 @@ namespace HighElixir.Implements.Observables
             return observable.Subscribe(new ActionObserver<T>(onNext, onComplete, onError));
         }
 
+        public static IDisposable Subscribe<T>(
+            this IObservable<T> observable,
+            Action<T> onNext,
+            out IObserver<T> observer,
+            Action onComplete = null,
+            Action<Exception> onError = null)
+        {
+            observer = new ActionObserver<T>(onNext, onComplete, onError);
+            return observable.Subscribe(observer);
+        }
+
         /// <summary>
         /// 値をフィルタリングするWhere拡張
         /// </summary>

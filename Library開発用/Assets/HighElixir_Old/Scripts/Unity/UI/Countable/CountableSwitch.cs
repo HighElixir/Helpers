@@ -1,4 +1,4 @@
-﻿using HighElixir.Hedgeable;
+﻿using HighElixir.Math.Hedgeable;
 using System;
 using TMPro;
 using UniRx;
@@ -28,37 +28,41 @@ namespace HighElixir.Unity.UI.Countable
         [Header("Data")]
         [SerializeField] private int _defaultAmount = 0;
         [SerializeField] private int _step = 1;
-        private Hedgeable<int> _value;
-        private int min = int.MinValue;
-        private int max = int.MaxValue;
+        private readonly ReactiveProperty<Hedgeable<int>> _value = new();
+        private int _min = int.MinValue;
+        private int _max = int.MaxValue;
 
         public int Min
         {
-            get => _value.MinValue;
+            get => _value.Value.MinValue;
             set
             {
-                _value.SetMin(value);
+                _value.Value.SetMin(value);
+                if (_value.Value.MinValue != _min)
+                    _min = value;
             }
         }
         public int Max
         {
-            get => _value.MaxValue;
+            get => _value.Value.MaxValue;
             set
             {
-                _value.SetMax(value);
+                _value.Value.SetMax(value);
+                if (_value.Value.MaxValue != _max)
+                    _max = value;
             }
         }
         public Func<int, int, bool> AllowChange { get; set; }
         public UnityEvent<ChangeResult<int>> OnValueChanged => _onValueChanged;
         public int Value
         {
-            get => _value;
+            get => _value.Value;
             set
             {
-                bool isValid = AllowChange == null || AllowChange.Invoke(_value, value - _value);
-                if (_value.CanSetValue(value) && isValid)
+                bool isValid = AllowChange == null || AllowChange.Invoke(_value.Value, value - _value.Value);
+                if (_value.Value.CanSetValue(value) && isValid)
                 {
-                    _value.Value = value;
+                    _value.Value.SetValue(value);
                     _text.text = _value.ToString();
                 }
             }
@@ -66,19 +70,19 @@ namespace HighElixir.Unity.UI.Countable
 
         public bool TrySetValue(int newValue)
         {
-            int old = _value;
+            int old = _value.Value;
             Value = newValue;
-            return _value != old && _value == newValue;
+            return _value.Value != old && _value.Value == newValue;
         }
 
         private void Awake()
         {
             // 初期値セット
-            _value = new Hedgeable<int>(_defaultAmount, min, max);
+            _value.Value = new Hedgeable<int>(_defaultAmount, _min, _max);
             var d = _value.Subscribe(x =>
             {
-                _text.text = x.NewValue.ToString();
-                _onValueChanged?.Invoke(x);
+                _text.text = x.LastChangeResult.NewValue.ToString();
+                _onValueChanged?.Invoke(x.LastChangeResult);
             }).AddTo(this);
             _text.text = _value.ToString();
             this.OnDestroyAsObservable().Subscribe(_ =>
@@ -88,13 +92,13 @@ namespace HighElixir.Unity.UI.Countable
             // Minus ボタン
             _minus.onClick.AddListener(() =>
             {
-                TrySetValue(_value - _step);
+                TrySetValue(_value.Value - _step);
             });
 
             // Plus ボタン
             _plus.onClick.AddListener(() =>
             {
-                TrySetValue(_value + _step);
+                TrySetValue(_value.Value + _step);
             });
 
             // テキスト入力確定時

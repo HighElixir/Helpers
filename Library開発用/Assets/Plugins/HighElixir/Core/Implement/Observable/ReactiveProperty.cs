@@ -7,7 +7,7 @@ namespace HighElixir.Implements.Observables
     /// 値を監視・通知できるプロパティ実装
     /// <br/>値が更新されるたびにOnNextを発行する
     /// </summary>
-    public class ReactiveProperty<T> : IObservable<T>, IDisposable
+    public class ReactiveProperty<T> : IHEObservable<T>, IDisposable
     {
         protected T _value;
         private bool _isDisposed;
@@ -42,6 +42,12 @@ namespace HighElixir.Implements.Observables
                 });
             }
             return null;
+        }
+
+        public void UnSubscribe(IObserver<T> observer)
+        {
+            if (_observers.Remove(observer))
+                observer?.OnCompleted();
         }
 
         /// <summary>全購読者へ値を通知</summary>

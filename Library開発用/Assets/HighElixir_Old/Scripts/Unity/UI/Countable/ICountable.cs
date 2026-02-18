@@ -1,5 +1,4 @@
-﻿
-using HighElixir.Hedgeable;
+﻿using HighElixir.Math.Hedgeable;
 using System;
 using UnityEngine.Events;
 
