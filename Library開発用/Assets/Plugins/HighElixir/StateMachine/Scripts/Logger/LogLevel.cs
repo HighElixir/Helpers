@@ -35,6 +35,18 @@ namespace HighElixir.StateMachines
         // 組み合わせ
         ALL = INFO | WARN | ERROR,
     }
+    public static class LogLevelExtension
+    {
+        // Non-extension wrappers for the corrected type name.
+        public static bool HasFlagFast(uint value, LogLevel flag) => LogLevelExtention.HasFlagFast(value, flag);
+        public static bool HasAnyFlagFast(LogLevel value, LogLevel flag) => LogLevelExtention.HasAnyFlagFast(value, flag);
+        public static bool HasFlagFast(LogLevel value, LogLevel flag) => LogLevelExtention.HasFlagFast(value, flag);
+        public static bool HasAnyFlagFast(uint value, LogLevel flag) => LogLevelExtention.HasAnyFlagFast(value, flag);
+        public static void Log(ILoggable logger, LogLevel level, string message) => LogLevelExtention.Log(logger, level, message);
+        public static void Throw(ILoggable logger, LogLevel level, Exception exception) => LogLevelExtention.Throw(logger, level, exception);
+    }
+
+    [Obsolete("Use LogLevelExtension instead.")]
     public static class LogLevelExtention
     {
         public static bool HasFlagFast(this uint value, LogLevel flag)
